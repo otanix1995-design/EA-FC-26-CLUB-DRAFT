@@ -100,6 +100,10 @@ export const translations = {
     uploadLogo: 'Enviar Imagem do Escudo',
     pasteLogoUrl: 'ou Cole a URL da Imagem (https://...)',
     removeLogo: 'Remover Escudo',
+    respin: 'Roletar Novamente',
+    clubNotInGame: 'Clube não tem no jogo? Roletar outro',
+    changeClub: 'Trocar Clube',
+    discardAndRespin: 'Descartar e Sortear Outro',
   },
   en: {
     appName: 'EA FC 26 CLUB DRAFT',
@@ -200,6 +204,10 @@ export const translations = {
     uploadLogo: 'Upload Crest Image',
     pasteLogoUrl: 'or Paste Image URL (https://...)',
     removeLogo: 'Remove Crest Image',
+    respin: 'Spin Again',
+    clubNotInGame: 'Club not in game? Spin another',
+    changeClub: 'Change Club',
+    discardAndRespin: 'Discard & Spin Again',
   },
   es: {
     appName: 'EA FC 26 CLUB DRAFT',
@@ -300,6 +308,10 @@ export const translations = {
     uploadLogo: 'Subir Imagen del Escudo',
     pasteLogoUrl: 'o Pegue la URL de la Imagen (https://...)',
     removeLogo: 'Quitar Escudo',
+    respin: 'Girar de Nuevo',
+    clubNotInGame: '¿El club no está en el juego? Girar otro',
+    changeClub: 'Cambiar Club',
+    discardAndRespin: 'Descartar y Girar de Nuevo',
   },
 };
 

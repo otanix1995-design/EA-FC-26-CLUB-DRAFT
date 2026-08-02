@@ -3,7 +3,7 @@ import { Club, Series, Settings } from '../types';
 import { RouletteWheel } from '../components/RouletteWheel';
 import { ClubCard } from '../components/ClubCard';
 import { getTranslation } from '../services/i18n';
-import { Swords, CheckCircle2, Play, Sparkles, Filter, ChevronDown, ChevronUp, Check, Shield } from 'lucide-react';
+import { Swords, CheckCircle2, Play, Sparkles, Filter, ChevronDown, ChevronUp, Check, Shield, RefreshCw } from 'lucide-react';
 
 interface DraftViewProps {
   series: Series;
@@ -27,6 +27,9 @@ export const DraftView: React.FC<DraftViewProps> = ({
   const [draftedP1Club, setDraftedP1Club] = useState<Club | null>(series.currentP1Club || null);
   const [draftedP2Club, setDraftedP2Club] = useState<Club | null>(series.currentP2Club || null);
   const [showFilterBar, setShowFilterBar] = useState(false);
+
+  const [rejectedP1ClubIds, setRejectedP1ClubIds] = useState<string[]>([]);
+  const [rejectedP2ClubIds, setRejectedP2ClubIds] = useState<string[]>([]);
 
   const [step, setStep] = useState<'spin_p1' | 'result_p1' | 'spin_p2' | 'result_p2' | 'vs_ready'>(
     series.status === 'drafting_p1' && !series.currentP1Club
@@ -77,11 +80,20 @@ export const DraftView: React.FC<DraftViewProps> = ({
     onUpdateExcludedDivisions(updated);
   };
 
-  // Excluded clubs in current match/series
-  const excludedForP1 = series.drawnClubIds || [];
-  const excludedForP2 = draftedP1Club
-    ? [...excludedForP1, draftedP1Club.id]
-    : excludedForP1;
+  // Excluded clubs in current match/series (including rejected missing clubs)
+  const excludedForP1 = useMemo(
+    () => [...(series.drawnClubIds || []), ...rejectedP1ClubIds],
+    [series.drawnClubIds, rejectedP1ClubIds]
+  );
+
+  const excludedForP2 = useMemo(
+    () => [
+      ...(series.drawnClubIds || []),
+      ...(draftedP1Club ? [draftedP1Club.id] : []),
+      ...rejectedP2ClubIds,
+    ],
+    [series.drawnClubIds, draftedP1Club, rejectedP2ClubIds]
+  );
 
   // Handle spin completions
   const handleP1SpinDone = (club: Club) => {
@@ -92,6 +104,22 @@ export const DraftView: React.FC<DraftViewProps> = ({
   const handleP2SpinDone = (club: Club) => {
     setDraftedP2Club(club);
     setStep('result_p2');
+  };
+
+  const handleRespinP1 = () => {
+    if (draftedP1Club) {
+      setRejectedP1ClubIds((prev) => [...prev, draftedP1Club.id]);
+    }
+    setDraftedP1Club(null);
+    setStep('spin_p1');
+  };
+
+  const handleRespinP2 = () => {
+    if (draftedP2Club) {
+      setRejectedP2ClubIds((prev) => [...prev, draftedP2Club.id]);
+    }
+    setDraftedP2Club(null);
+    setStep('spin_p2');
   };
 
   const confirmP1 = () => {
@@ -197,14 +225,32 @@ export const DraftView: React.FC<DraftViewProps> = ({
 
           <ClubCard club={draftedP1Club} playerTitle={series.player1Name} size="large" />
 
-          <button
-            id="confirm-p1-club-btn"
-            onClick={confirmP1}
-            className="w-full max-w-xs py-4 px-6 rounded-2xl bg-gradient-to-r from-[#00FF85] via-[#02E374] to-[#00CC66] text-[#0a0b0e] font-black text-lg uppercase tracking-wider shadow-xl shadow-[#00FF85]/30 hover:scale-105 transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/40"
-          >
-            <CheckCircle2 className="w-6 h-6" />
-            <span>{getTranslation(lang, 'confirmClub')}</span>
-          </button>
+          {/* Actions: Confirm or Respin */}
+          <div className="flex flex-col items-center gap-3 w-full max-w-md">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full justify-center">
+              <button
+                id="confirm-p1-club-btn"
+                onClick={confirmP1}
+                className="flex-1 w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#00FF85] via-[#02E374] to-[#00CC66] text-[#0a0b0e] font-black text-lg uppercase tracking-wider shadow-xl shadow-[#00FF85]/30 hover:scale-105 transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/40"
+              >
+                <CheckCircle2 className="w-6 h-6" />
+                <span>{getTranslation(lang, 'confirmClub')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRespinP1}
+                className="w-full sm:w-auto py-4 px-5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-sm tracking-wide uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+              >
+                <RefreshCw className="w-5 h-5 text-amber-400" />
+                <span>{getTranslation(lang, 'respin')}</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-amber-400/90 font-medium text-center">
+              💡 {getTranslation(lang, 'clubNotInGame')}
+            </p>
+          </div>
         </div>
       )}
 
@@ -235,14 +281,32 @@ export const DraftView: React.FC<DraftViewProps> = ({
 
           <ClubCard club={draftedP2Club} playerTitle={series.player2Name} size="large" />
 
-          <button
-            id="confirm-p2-club-btn"
-            onClick={confirmP2}
-            className="w-full max-w-xs py-4 px-6 rounded-2xl bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-500 text-[#0a0b0e] font-black text-lg uppercase tracking-wider shadow-xl shadow-cyan-400/30 hover:scale-105 transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/40"
-          >
-            <CheckCircle2 className="w-6 h-6" />
-            <span>{getTranslation(lang, 'confirmClub')}</span>
-          </button>
+          {/* Actions: Confirm or Respin */}
+          <div className="flex flex-col items-center gap-3 w-full max-w-md">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full justify-center">
+              <button
+                id="confirm-p2-club-btn"
+                onClick={confirmP2}
+                className="flex-1 w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-500 text-[#0a0b0e] font-black text-lg uppercase tracking-wider shadow-xl shadow-cyan-400/30 hover:scale-105 transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/40"
+              >
+                <CheckCircle2 className="w-6 h-6" />
+                <span>{getTranslation(lang, 'confirmClub')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRespinP2}
+                className="w-full sm:w-auto py-4 px-5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-sm tracking-wide uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+              >
+                <RefreshCw className="w-5 h-5 text-amber-400" />
+                <span>{getTranslation(lang, 'respin')}</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-amber-400/90 font-medium text-center">
+              💡 {getTranslation(lang, 'clubNotInGame')}
+            </p>
+          </div>
         </div>
       )}
 
@@ -261,6 +325,14 @@ export const DraftView: React.FC<DraftViewProps> = ({
             {/* Player 1 Card */}
             <div className="flex flex-col items-center">
               <ClubCard club={draftedP1Club} playerTitle={series.player1Name} size="normal" />
+              <button
+                type="button"
+                onClick={handleRespinP1}
+                className="mt-3 py-2 px-4 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs uppercase transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 text-amber-400" />
+                <span>Roletar de novo ({series.player1Name})</span>
+              </button>
             </div>
 
             {/* Neon VS Badge floating in center */}
@@ -275,6 +347,14 @@ export const DraftView: React.FC<DraftViewProps> = ({
             {/* Player 2 Card */}
             <div className="flex flex-col items-center">
               <ClubCard club={draftedP2Club} playerTitle={series.player2Name} size="normal" />
+              <button
+                type="button"
+                onClick={handleRespinP2}
+                className="mt-3 py-2 px-4 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs uppercase transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 text-amber-400" />
+                <span>Roletar de novo ({series.player2Name})</span>
+              </button>
             </div>
           </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Club, Settings } from '../types';
 import { audio } from '../services/audio';
 import { getTranslation } from '../services/i18n';
-import { Dices, Trophy, RefreshCw, Sparkles, Shield } from 'lucide-react';
+import { Dices, RefreshCw, Sparkles, Shield } from 'lucide-react';
 
 interface RouletteWheelProps {
   clubs: Club[];
@@ -11,6 +11,7 @@ interface RouletteWheelProps {
   playerName: string;
   settings: Settings;
   onSpinComplete: (winningClub: Club) => void;
+  onRespin?: () => void;
 }
 
 export const RouletteWheel: React.FC<RouletteWheelProps> = ({
@@ -20,14 +21,16 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
   playerName,
   settings,
   onSpinComplete,
+  onRespin,
 }) => {
   const [isSpinning, setIsSpinning] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const [tickerList, setTickerList] = useState<Club[]>([]);
   const [winningClub, setWinningClub] = useState<Club | null>(null);
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number | null>(null);
+  const reelRef = useRef<HTMLDivElement>(null);
+  const currentPosIndexRef = useRef<number>(0);
+  const spinTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const lang = settings.language || 'pt';
 
@@ -37,19 +40,31 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
     return pool.length > 0 ? pool : clubs; // Fallback to all if pool exhausted
   }, [clubs, excludedClubIds]);
 
-  // Build extended repeating reel for infinite visual scrolling
+  // Build extended repeating reel for smooth scrolling
   useEffect(() => {
     if (availableClubs.length === 0) return;
-    // Repeat candidate clubs to build a long horizontal/vertical reel (e.g. 150 items)
     const list: Club[] = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 12; i++) {
       list.push(...availableClubs);
     }
     setTickerList(list);
+    currentPosIndexRef.current = 0;
+    if (reelRef.current) {
+      reelRef.current.style.transition = 'none';
+      reelRef.current.style.transform = `translate3d(0, ${72 * 2}px, 0)`;
+    }
   }, [availableClubs]);
 
+  const itemHeight = 72; // px per item in reel
+
   const spin = () => {
-    if (isSpinning || availableClubs.length === 0) return;
+    if (isSpinning || availableClubs.length === 0 || tickerList.length === 0) return;
+
+    const reel = reelRef.current;
+    if (!reel) return;
+
+    setIsSpinning(true);
+    setWinningClub(null);
 
     if (settings.soundEnabled) {
       audio.playSpinStart();
@@ -58,80 +73,80 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
       navigator.vibrate([100, 50, 100]);
     }
 
-    setIsSpinning(true);
-    setWinningClub(null);
-
-    // Pick winning club randomly with equal probability
+    // Pick winning club randomly
     const randomIndex = Math.floor(Math.random() * availableClubs.length);
     const chosenClub = availableClubs[randomIndex];
 
-    // Find a target index deep inside the tickerList so the wheel spins smoothly for full duration
+    // Target index deep inside the tickerList (e.g. near the 80% mark)
     const targetBaseIndex = Math.floor(tickerList.length * 0.75);
     let targetIndex = targetBaseIndex - (targetBaseIndex % availableClubs.length) + randomIndex;
     if (targetIndex >= tickerList.length) {
       targetIndex = tickerList.length - availableClubs.length + randomIndex;
     }
 
-    const startTime = performance.now();
     const spinDurationMs = (durationSeconds || 8) * 1000;
-    const startIndex = selectedIndex;
-    const totalDistance = targetIndex - startIndex;
 
-    let lastTickIdx = startIndex;
+    // Reset position to start position cleanly
+    const startPosIndex = currentPosIndexRef.current % availableClubs.length;
+    currentPosIndexRef.current = startPosIndex;
+    const startOffset = -(startPosIndex * itemHeight) + itemHeight * 2;
+    const targetOffset = -(targetIndex * itemHeight) + itemHeight * 2;
 
-    const animateSpin = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / spinDurationMs, 1);
+    reel.style.transition = 'none';
+    reel.style.transform = `translate3d(0, ${startOffset}px, 0)`;
 
-      // Ease-out cubic for realistic casino wheel deceleration
-      const easeOut = 1 - Math.pow(1 - progress, 3);
-      const currentIndex = Math.floor(startIndex + totalDistance * easeOut);
+    // Force browser repaint before starting transition
+    void reel.offsetHeight;
 
-      setSelectedIndex(currentIndex);
+    // Apply GPU-accelerated smooth ease-out curve
+    reel.style.transition = `transform ${spinDurationMs}ms cubic-bezier(0.1, 0.85, 0.15, 1.0)`;
+    reel.style.transform = `translate3d(0, ${targetOffset}px, 0)`;
 
-      // Play tick sound on item change
-      if (currentIndex !== lastTickIdx) {
-        lastTickIdx = currentIndex;
-        if (settings.soundEnabled && Math.random() > 0.1) {
+    // Throttled audio tick sound player during spin
+    if (settings.soundEnabled) {
+      let elapsed = 0;
+      const intervalMs = 70;
+      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
+
+      tickIntervalRef.current = setInterval(() => {
+        elapsed += intervalMs;
+        // Frequency slows down as wheel decelerates
+        const progress = elapsed / spinDurationMs;
+        if (progress < 0.95) {
           audio.playTick();
         }
-        if (settings.vibrationEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate(15);
-        }
+      }, 90);
+    }
+
+    // Schedule completion at end of CSS transition
+    if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
+
+    spinTimerRef.current = setTimeout(() => {
+      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
+
+      setIsSpinning(false);
+      currentPosIndexRef.current = targetIndex;
+      setWinningClub(chosenClub);
+
+      if (settings.soundEnabled) {
+        audio.playFanfare();
+      }
+      if (settings.vibrationEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([200, 100, 300]);
       }
 
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animateSpin);
-      } else {
-        // Spin finished
-        setIsSpinning(false);
-        setSelectedIndex(targetIndex);
-        setWinningClub(chosenClub);
-
-        if (settings.soundEnabled) {
-          audio.playFanfare();
-        }
-        if (settings.vibrationEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate([200, 100, 300]);
-        }
-
-        onSpinComplete(chosenClub);
-      }
-    };
-
-    animationRef.current = requestAnimationFrame(animateSpin);
+      onSpinComplete(chosenClub);
+    }, spinDurationMs);
   };
 
   useEffect(() => {
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
+      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
     };
   }, []);
 
-  const itemHeight = 72; // px per item in reel
-  const offset = -(selectedIndex * itemHeight) + itemHeight * 2; // Center offset
+  const initialOffset = -(currentPosIndexRef.current * itemHeight) + itemHeight * 2;
 
   return (
     <div className="w-full max-w-lg mx-auto flex flex-col items-center gap-6 py-4">
@@ -146,66 +161,67 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
 
       {/* Casino Ticker Cylinder Container */}
       <div className="relative w-full h-72 rounded-3xl bg-[#0a0b0e] border-2 border-[#00FF85]/50 shadow-2xl shadow-[#00FF85]/20 overflow-hidden flex flex-col items-center justify-center">
-        {/* Glow Effects */}
-        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#0a0b0e] via-[#0a0b0e]/80 to-transparent z-10 pointer-events-none" />
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0a0b0e] via-[#0a0b0e]/80 to-transparent z-10 pointer-events-none" />
+        {/* Glow & Depth Overlays */}
+        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#0a0b0e] via-[#0a0b0e]/90 to-transparent z-10 pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0a0b0e] via-[#0a0b0e]/90 to-transparent z-10 pointer-events-none" />
 
         {/* Center Target Pointer / Selector Line */}
-        <div className="absolute inset-x-2 top-[108px] h-[72px] bg-gradient-to-r from-[#00FF85]/10 via-[#00FF85]/25 to-[#00FF85]/10 border-y-2 border-[#00FF85] z-20 pointer-events-none rounded-xl flex items-center justify-between px-3 shadow-lg shadow-[#00FF85]/20">
-          <div className="w-3 h-3 bg-[#00FF85] rounded-full animate-ping" />
-          <div className="w-3 h-3 bg-[#00FF85] rounded-full animate-ping" />
+        <div className="absolute inset-x-2 top-[108px] h-[72px] bg-gradient-to-r from-[#00FF85]/15 via-[#00FF85]/30 to-[#00FF85]/15 border-y-2 border-[#00FF85] z-20 pointer-events-none rounded-xl flex items-center justify-between px-3 shadow-xl shadow-[#00FF85]/30">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-[#00FF85] rounded-full animate-ping" />
+            <div className="w-2 h-4 bg-[#00FF85] rounded-sm" />
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-4 bg-[#00FF85] rounded-sm" />
+            <div className="w-3 h-3 bg-[#00FF85] rounded-full animate-ping" />
+          </div>
         </div>
 
         {/* Moving Club Ticker Reel */}
         <div
-          ref={containerRef}
-          className="w-full transition-transform ease-out"
+          ref={reelRef}
+          className="w-full"
           style={{
-            transform: `translateY(${offset}px)`,
+            transform: `translate3d(0, ${initialOffset}px, 0)`,
+            willChange: 'transform',
           }}
         >
-          {tickerList.map((club, idx) => {
-            const isTarget = idx === selectedIndex;
-            return (
-              <div
-                key={`${club.id}_${idx}`}
-                className={`h-[72px] flex items-center justify-between px-6 transition-all duration-150 ${
-                  isTarget
-                    ? 'scale-105 opacity-100 font-black text-white text-lg'
-                    : 'scale-95 opacity-30 text-gray-400 text-sm'
-                }`}
-              >
-                <div className="flex items-center gap-3 truncate">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs text-white border border-white/20 shadow overflow-hidden relative shrink-0"
-                    style={{ backgroundColor: club.logoUrl ? '#111827' : (club.badgeColor || '#222') }}
-                  >
-                    {club.logoUrl ? (
-                      <img
-                        src={club.logoUrl}
-                        alt={club.nome}
-                        className="w-full h-full object-contain p-0.5"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <Shield className="w-4 h-4" />
-                    )}
-                  </div>
-                  <span className="truncate">{club.nome}</span>
+          {tickerList.map((club, idx) => (
+            <div
+              key={`${club.id}_${idx}`}
+              style={{ height: `${itemHeight}px` }}
+              className="flex items-center justify-between px-6 border-b border-white/5 hover:bg-white/5 transition-colors"
+            >
+              <div className="flex items-center gap-3 truncate">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs text-white border border-white/20 shadow overflow-hidden relative shrink-0 bg-gray-900"
+                  style={{ backgroundColor: club.logoUrl ? '#111827' : (club.badgeColor || '#222') }}
+                >
+                  {club.logoUrl ? (
+                    <img
+                      src={club.logoUrl}
+                      alt={club.nome}
+                      className="w-full h-full object-contain p-0.5"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <Shield className="w-5 h-5 text-gray-300" />
+                  )}
                 </div>
-
-                <div className="text-right text-xs font-mono font-semibold text-gray-400">
-                  <span>{club.pais}</span>
-                  <span className="block text-[10px] text-amber-400/80">{club.liga}</span>
-                </div>
+                <span className="truncate font-black text-white text-base">{club.nome}</span>
               </div>
-            );
-          })}
+
+              <div className="text-right text-xs font-mono font-semibold text-gray-300">
+                <span>{club.pais}</span>
+                <span className="block text-[10px] text-amber-400 font-bold">{club.liga}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Spin Button */}
-      <div className="w-full flex justify-center">
+      {/* Spin / Respin Buttons */}
+      <div className="w-full flex flex-col items-center gap-3">
         {!isSpinning ? (
           <button
             id="roulette-spin-button"
@@ -214,7 +230,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
             className="w-full max-w-xs py-4 px-8 rounded-2xl bg-gradient-to-r from-[#00FF85] via-[#02E374] to-[#00CC66] text-[#0a0b0e] font-black text-xl tracking-wider uppercase shadow-xl shadow-[#00FF85]/30 hover:shadow-[#00FF85]/50 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 border-2 border-white/40 cursor-pointer"
           >
             <Dices className="w-7 h-7" />
-            <span>{getTranslation(lang, 'spin')}</span>
+            <span>{winningClub ? getTranslation(lang, 'respin') : getTranslation(lang, 'spin')}</span>
           </button>
         ) : (
           <div className="w-full max-w-xs py-4 px-8 rounded-2xl bg-gray-800/90 border border-[#00FF85]/40 text-[#00FF85] font-extrabold text-lg flex items-center justify-center gap-3 animate-pulse shadow-lg">
@@ -222,7 +238,19 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
             <span>{getTranslation(lang, 'spinning')} ({durationSeconds}s)</span>
           </div>
         )}
+
+        {onRespin && !isSpinning && winningClub && (
+          <button
+            type="button"
+            onClick={onRespin}
+            className="text-xs text-amber-400 hover:text-amber-300 font-bold uppercase tracking-wider underline cursor-pointer flex items-center gap-1.5 py-1 px-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl transition-all"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>{getTranslation(lang, 'clubNotInGame')}</span>
+          </button>
+        )}
       </div>
     </div>
   );
 };
+
