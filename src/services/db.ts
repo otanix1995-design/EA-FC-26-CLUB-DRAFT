@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { Club, Series, Settings, StatisticsData } from '../types';
 import { DEFAULT_CLUBS } from '../data/defaultClubs';
+import { getKnownClubLogo } from './clubLogos';
 
 const CLUBS_KEY = 'eafc26_clubs_v1';
 const HISTORY_KEY = 'eafc26_series_history_v1';
@@ -61,6 +62,7 @@ export function sanitizeClub(c: Club): Club {
     pais: pais || 'Internacional',
     liga: liga || 'Liga Geral',
     divisao: divisao || '1ª Divisão',
+    logoUrl: c.logoUrl || getKnownClubLogo(nome || ''),
   };
 }
 
