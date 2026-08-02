@@ -1,0 +1,6 @@
+{
+  "name": "EA FC 26 CLUB DRAFT",
+  "description": "Aplicativo oficial de sorteios de clubes do EA SPORTS FC 26 para partidas 1v1 com suporte a importação Excel, banco de dados offline, roleta 3D animada e estatísticas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
