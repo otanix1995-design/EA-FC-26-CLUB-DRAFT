@@ -364,16 +364,16 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
             {/* PHASE 3: REVELAÇÃO DA LIGA */}
             {phase === 'LEAGUE' && chosenClub && (
               <div className="flex flex-col items-center gap-3 animate-pulse">
-                <div className="w-24 h-24 rounded-3xl bg-amber-500/10 border-2 border-amber-400/80 flex items-center justify-center p-3 shadow-2xl shadow-amber-500/30 overflow-hidden backdrop-blur-md">
+                <div className="w-24 h-24 rounded-3xl bg-slate-100 border-2 border-amber-400/80 flex items-center justify-center p-3 shadow-2xl shadow-amber-500/30 overflow-hidden backdrop-blur-md">
                   {getLeagueLogo(chosenClub.liga) ? (
                     <img
                       src={getLeagueLogo(chosenClub.liga)}
                       alt={chosenClub.liga}
-                      className="w-full h-full object-contain filter drop-shadow-md"
+                      className="w-full h-full object-contain filter drop-shadow-sm"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <Trophy className="w-12 h-12 text-amber-400" />
+                    <Trophy className="w-12 h-12 text-amber-500" />
                   )}
                 </div>
                 <span className="text-xs font-black uppercase text-amber-400 tracking-widest bg-amber-500/10 border border-amber-500/40 px-3 py-1 rounded-full">
@@ -448,12 +448,14 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
                       </span>
                       <span className="px-3 py-1 rounded-xl bg-gray-900 border border-gray-800 text-xs text-amber-300 font-bold flex items-center gap-1.5">
                         {getLeagueLogo(chosenClub.liga) ? (
-                          <img
-                            src={getLeagueLogo(chosenClub.liga)}
-                            alt={chosenClub.liga}
-                            className="w-4 h-4 object-contain shrink-0"
-                            referrerPolicy="no-referrer"
-                          />
+                          <span className="w-5 h-5 rounded-md bg-slate-100 p-0.5 inline-flex items-center justify-center shrink-0">
+                            <img
+                              src={getLeagueLogo(chosenClub.liga)}
+                              alt={chosenClub.liga}
+                              className="w-full h-full object-contain shrink-0"
+                              referrerPolicy="no-referrer"
+                            />
+                          </span>
                         ) : (
                           <Trophy className="w-3.5 h-3.5 text-amber-400" />
                         )}

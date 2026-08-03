@@ -306,7 +306,9 @@ export const NewSeriesView: React.FC<NewSeriesViewProps> = ({
                         }`}
                       >
                         {logo ? (
-                          <img src={logo} alt={leagueName} className="w-3.5 h-3.5 object-contain" referrerPolicy="no-referrer" />
+                          <span className="w-4 h-4 rounded-xs bg-slate-100 p-0.5 inline-flex items-center justify-center shrink-0">
+                            <img src={logo} alt={leagueName} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                          </span>
                         ) : null}
                         <span>{leagueName}</span>
                         {isSelected ? <Check className="w-3.5 h-3.5 text-cyan-400" /> : null}

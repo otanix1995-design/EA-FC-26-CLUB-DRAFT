@@ -99,12 +99,14 @@ export const ClubCard: React.FC<ClubCardProps> = ({
       <div className="w-full mt-3 pt-2 border-t border-amber-400/20 flex flex-col gap-1 text-xs">
         <div className="flex items-center justify-center gap-1.5 text-amber-100/90 font-medium">
           {getLeagueLogo(club.liga) ? (
-            <img
-              src={getLeagueLogo(club.liga)}
-              alt={club.liga}
-              className="w-4 h-4 object-contain shrink-0 filter drop-shadow"
-              referrerPolicy="no-referrer"
-            />
+            <span className="w-5 h-5 rounded-md bg-slate-100 p-0.5 inline-flex items-center justify-center shrink-0 shadow-sm">
+              <img
+                src={getLeagueLogo(club.liga)}
+                alt={club.liga}
+                className="w-full h-full object-contain shrink-0"
+                referrerPolicy="no-referrer"
+              />
+            </span>
           ) : (
             <Globe className="w-3.5 h-3.5 text-[#00FF85]" />
           )}

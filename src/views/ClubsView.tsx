@@ -436,7 +436,7 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
                 {/* Shield / Logo Badge */}
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs text-black shrink-0 shadow-md border border-white/20 overflow-hidden relative"
-                  style={{ backgroundColor: club.logoUrl ? '#0a0b0e' : (club.badgeColor || '#00FF85') }}
+                  style={{ backgroundColor: club.logoUrl ? '#f1f5f9' : (club.badgeColor || '#00FF85') }}
                 >
                   {club.logoUrl ? (
                     <img
@@ -456,12 +456,14 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
                   </h4>
                   <div className="flex items-center gap-1.5 text-[11px] text-gray-400 truncate mt-0.5">
                     {getLeagueLogo(club.liga) ? (
-                      <img
-                        src={getLeagueLogo(club.liga)}
-                        alt={club.liga}
-                        className="w-3.5 h-3.5 object-contain shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
+                      <span className="w-4 h-4 rounded-xs bg-slate-100 p-0.5 inline-flex items-center justify-center shrink-0">
+                        <img
+                          src={getLeagueLogo(club.liga)}
+                          alt={club.liga}
+                          className="w-full h-full object-contain shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      </span>
                     ) : null}
                     <span className="truncate">{club.liga}</span>
                     <span className="text-gray-600">•</span>

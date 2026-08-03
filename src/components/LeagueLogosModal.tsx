@@ -319,16 +319,16 @@ export const LeagueLogosModal: React.FC<LeagueLogosModalProps> = ({
               >
                 <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
                   {/* Logo Display Box */}
-                  <div className="w-14 h-14 rounded-2xl bg-[#12151c] border border-gray-800 flex items-center justify-center p-2 shrink-0 overflow-hidden shadow-md">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200/90 flex items-center justify-center p-2 shrink-0 overflow-hidden shadow-md">
                     {currentLogo ? (
                       <img
                         src={currentLogo}
                         alt={leagueName}
-                        className="w-full h-full object-contain filter drop-shadow"
+                        className="w-full h-full object-contain filter drop-shadow-sm"
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <Trophy className="w-7 h-7 text-amber-400 opacity-60" />
+                      <Trophy className="w-7 h-7 text-amber-500" />
                     )}
                   </div>
 
