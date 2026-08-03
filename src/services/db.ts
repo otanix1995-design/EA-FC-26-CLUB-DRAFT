@@ -130,10 +130,17 @@ export function sanitizeClub(c: Club): Club {
 
   // Apply EA FC 26 Resto do Mundo rule:
   // If the country is not one of the 25 official countries with licensed leagues,
-  // classify country as "Resto do Mundo" and league as "LIGA CLÁSICA E RDM masculina"
+  // classify country as "Resto do Mundo", division as "1ª Divisão",
+  // and split league into either "LIGA CLÁSICA" or "RDM masculina"
   if (!pais || !isOfficialFcCountry(pais)) {
     pais = 'Resto do Mundo';
-    liga = 'LIGA CLÁSICA E RDM masculina';
+    divisao = '1ª Divisão';
+    const lowerLiga = (liga || '').toLowerCase();
+    if (lowerLiga.includes('clasica') || lowerLiga.includes('clásica') || lowerLiga.includes('classic')) {
+      liga = 'LIGA CLÁSICA';
+    } else {
+      liga = 'RDM masculina';
+    }
   } else {
     liga = liga || 'Liga Geral';
   }
@@ -165,6 +172,10 @@ export function disambiguateLeagues(clubs: Club[]): { clubs: Club[]; mutated: bo
     'a-league men',
     'rest of world',
     'resto do mundo',
+    'rdm masculina',
+    'liga clásica',
+    'liga clasica',
+    'liga clásica e rdm masculina',
   ]);
 
   clubs.forEach((c) => {
