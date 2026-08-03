@@ -3,8 +3,8 @@ import { Club, Series, Settings } from '../types';
 import { RouletteWheel } from '../components/RouletteWheel';
 import { ClubCard } from '../components/ClubCard';
 import { getTranslation } from '../services/i18n';
-import { getCountryFlag } from '../components/RouletteWheel';
 import { getLeagueLogo } from '../services/leagueLogos';
+import { CountryFlag } from '../components/CountryFlag';
 import { Swords, CheckCircle2, Play, Sparkles, Filter, ChevronDown, ChevronUp, Check, Shield, RefreshCw, Trophy, Globe } from 'lucide-react';
 
 interface DraftViewProps {
@@ -357,7 +357,6 @@ export const DraftView: React.FC<DraftViewProps> = ({
                       {allCountries.map((countryName) => {
                         const isExcluded = (series.excludedCountries || []).includes(countryName);
                         const isEnabled = !isExcluded;
-                        const flag = getCountryFlag(countryName);
 
                         return (
                           <button
@@ -370,7 +369,7 @@ export const DraftView: React.FC<DraftViewProps> = ({
                                 : 'bg-[#12151c] text-gray-500 border-gray-800 line-through opacity-50'
                             }`}
                           >
-                            <span>{flag}</span>
+                            <CountryFlag country={countryName} imageClassName="w-4 h-2.5 object-cover rounded-2xs inline-block shrink-0" />
                             <span>{countryName}</span>
                             {isEnabled ? <Check className="w-3 h-3 text-emerald-400" /> : null}
                           </button>

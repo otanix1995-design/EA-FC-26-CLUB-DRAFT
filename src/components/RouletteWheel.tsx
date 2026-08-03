@@ -3,6 +3,7 @@ import { Club, Settings } from '../types';
 import { audio } from '../services/audio';
 import { getTranslation } from '../services/i18n';
 import { getLeagueLogo } from '../services/leagueLogos';
+import { CountryFlag } from './CountryFlag';
 import { Dices, Sparkles, Shield, Trophy, Globe, TrendingUp, FastForward, CheckCircle2, RefreshCw } from 'lucide-react';
 
 interface RouletteWheelProps {
@@ -344,9 +345,13 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
             {/* PHASE 2: REVELAÇÃO DO PAÍS */}
             {phase === 'COUNTRY' && chosenClub && (
               <div className="flex flex-col items-center gap-3 animate-bounce">
-                <span className="block text-7xl drop-shadow-[0_0_25px_rgba(255,255,255,0.6)]">
-                  {getCountryFlag(chosenClub.pais)}
-                </span>
+                <div className="flex items-center justify-center drop-shadow-[0_0_25px_rgba(255,255,255,0.6)]">
+                  <CountryFlag
+                    country={chosenClub.pais}
+                    className="text-7xl"
+                    imageClassName="w-32 h-20 object-cover rounded-xl border-2 border-white/40 shadow-2xl"
+                  />
+                </div>
                 <span className="text-xs font-black uppercase text-[#00FF85] tracking-widest bg-[#00FF85]/10 border border-[#00FF85]/40 px-3 py-1 rounded-full">
                   🌍 {getTranslation(lang, 'revealingCountry')}
                 </span>
@@ -437,8 +442,8 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
 
                     {/* Meta info pills */}
                     <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
-                      <span className="px-3 py-1 rounded-xl bg-gray-900 border border-gray-800 text-xs text-gray-300 font-bold flex items-center gap-1">
-                        <span>{getCountryFlag(chosenClub.pais)}</span>
+                      <span className="px-3 py-1 rounded-xl bg-gray-900 border border-gray-800 text-xs text-gray-300 font-bold flex items-center gap-1.5">
+                        <CountryFlag country={chosenClub.pais} imageClassName="w-4 h-2.5 object-cover rounded-2xs inline-block shrink-0" />
                         <span>{chosenClub.pais}</span>
                       </span>
                       <span className="px-3 py-1 rounded-xl bg-gray-900 border border-gray-800 text-xs text-amber-300 font-bold flex items-center gap-1.5">

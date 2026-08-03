@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Club, Settings } from '../types';
 import { getTranslation } from '../services/i18n';
-import { getCountryFlag } from './RouletteWheel';
+import { CountryFlag } from './CountryFlag';
 import {
   getLeagueLogo,
   setCustomLeagueLogo,
@@ -307,7 +307,6 @@ export const LeagueLogosModal: React.FC<LeagueLogosModalProps> = ({
             const isEditing = editingLeague === leagueName;
 
             const primaryCountry = countries[0] || 'Internacional';
-            const countryFlag = getCountryFlag(primaryCountry);
             const primaryDivision = divisions[0] || '1ª Divisão';
 
             return (
@@ -346,8 +345,8 @@ export const LeagueLogosModal: React.FC<LeagueLogosModalProps> = ({
                     {/* Metadata Badges: País, Divisão, Clubes */}
                     <div className="flex flex-wrap items-center gap-1.5 text-xs">
                       {/* Country Badge */}
-                      <span className="px-2.5 py-0.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-bold flex items-center gap-1">
-                        <span>{countryFlag}</span>
+                      <span className="px-2.5 py-0.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-bold flex items-center gap-1.5">
+                        <CountryFlag country={primaryCountry} imageClassName="w-4 h-2.5 object-cover rounded-2xs inline-block shrink-0" />
                         <span>{countries.join(', ') || 'Internacional'}</span>
                       </span>
 

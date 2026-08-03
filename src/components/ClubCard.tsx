@@ -2,6 +2,7 @@ import React from 'react';
 import { Club } from '../types';
 import { getLeagueLogo } from '../services/leagueLogos';
 import { Trophy, Shield, Globe, MapPin } from 'lucide-react';
+import { CountryFlag } from './CountryFlag';
 
 interface ClubCardProps {
   club: Club;
@@ -16,23 +17,6 @@ export const ClubCard: React.FC<ClubCardProps> = ({
   size = 'normal',
   animate = true,
 }) => {
-  const getFlagEmoji = (countryName: string) => {
-    const c = countryName.toLowerCase();
-    if (c.includes('espanha') || c.includes('spain')) return '🇪🇸';
-    if (c.includes('inglaterra') || c.includes('england')) return '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
-    if (c.includes('itália') || c.includes('italy') || c.includes('italia')) return '🇮🇹';
-    if (c.includes('alemanha') || c.includes('germany')) return '🇩🇪';
-    if (c.includes('frança') || c.includes('france') || c.includes('franca')) return '🇫🇷';
-    if (c.includes('brasil') || c.includes('brazil')) return '🇧🇷';
-    if (c.includes('arábia') || c.includes('saudi')) return '🇸🇦';
-    if (c.includes('portugal')) return '🇵🇹';
-    if (c.includes('holanda') || c.includes('netherlands')) return '🇳🇱';
-    if (c.includes('estados unidos') || c.includes('usa')) return '🇺🇸';
-    if (c.includes('argentina')) return '🇦🇷';
-    if (c.includes('uruguai')) return '🇺🇾';
-    return '🌍';
-  };
-
   const rating = club.rating || 82;
 
   // Sizing styles
@@ -72,9 +56,9 @@ export const ClubCard: React.FC<ClubCardProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-md border border-[#E5B842]/20 text-base">
-          <span>{getFlagEmoji(club.pais)}</span>
-          <span className="text-[11px] font-semibold text-gray-300">{club.pais}</span>
+        <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-md border border-[#E5B842]/20 text-xs">
+          <CountryFlag country={club.pais} imageClassName="w-5 h-3.5 object-cover rounded-xs border border-amber-400/30 shrink-0" />
+          <span className="text-[11px] font-semibold text-gray-300 truncate max-w-[90px]">{club.pais}</span>
         </div>
       </div>
 

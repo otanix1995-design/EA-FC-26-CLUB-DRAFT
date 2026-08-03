@@ -3,6 +3,7 @@ import { Club, Settings } from '../types';
 import { getTranslation } from '../services/i18n';
 import { getLeagueLogo } from '../services/leagueLogos';
 import { LeagueLogosModal } from '../components/LeagueLogosModal';
+import { CountryFlag } from '../components/CountryFlag';
 import {
   Shield,
   Search,
@@ -459,7 +460,10 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
                       {club.divisao}
                     </span>
                   </div>
-                  <p className="text-[10px] text-gray-500 font-medium truncate">{club.pais}</p>
+                  <p className="text-[10px] text-gray-500 font-medium truncate flex items-center gap-1 mt-0.5">
+                    <CountryFlag country={club.pais} imageClassName="w-4 h-2.5 object-cover rounded-2xs inline-block shrink-0" />
+                    <span>{club.pais}</span>
+                  </p>
                 </div>
               </div>
 

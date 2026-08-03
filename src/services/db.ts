@@ -366,6 +366,7 @@ class DatabaseService {
           let bestCountryCol = -1;
           let bestLeagueCol = -1;
           let bestDivisionCol = -1;
+          let bestRatingCol = -1;
 
           for (let r = 0; r < Math.min(rawRows.length, 10); r++) {
             const row = rawRows[r];
@@ -375,6 +376,7 @@ class DatabaseService {
             let foundCountry = -1;
             let foundLeague = -1;
             let foundDivision = -1;
+            let foundRating = -1;
 
             row.forEach((cellVal, cIdx) => {
               const cellRaw = String(cellVal || '').trim();
@@ -402,6 +404,11 @@ class DatabaseService {
                 (cellStr === 'pais' || cellStr === 'country' || cellStr === 'nacao' || cellStr === 'nation' || cellStr === 'nacionalidade' || cellStr === 'estado')
               ) {
                 foundCountry = cIdx;
+              } else if (
+                foundRating === -1 &&
+                (cellStr === 'ger' || cellStr === 'geral' || cellStr === 'ovr' || cellStr === 'overall' || cellStr === 'rating' || cellStr === 'nota' || cellStr === 'forca' || cellStr === 'over' || cellStr === 'power')
+              ) {
+                foundRating = cIdx;
               }
             });
 
@@ -411,6 +418,7 @@ class DatabaseService {
             if (foundLeague !== -1) score++;
             if (foundDivision !== -1) score++;
             if (foundCountry !== -1) score++;
+            if (foundRating !== -1) score++;
 
             if (score > maxScore) {
               maxScore = score;
@@ -419,6 +427,7 @@ class DatabaseService {
               bestLeagueCol = foundLeague;
               bestDivisionCol = foundDivision;
               bestCountryCol = foundCountry;
+              bestRatingCol = foundRating;
             }
           }
 
@@ -427,13 +436,15 @@ class DatabaseService {
           let leagueCol = bestLeagueCol;
           let divisionCol = bestDivisionCol;
           let countryCol = bestCountryCol;
+          let ratingCol = bestRatingCol;
 
-          // If no row had >= 2 matches, fallback to default EA FC order: A=Clube, B=Liga, C=Divisão, D=País
+          // If no row had >= 2 matches, fallback to default EA FC order: A=Clube, B=Liga, C=Divisão, D=País, E=GER
           if (maxScore < 2) {
             if (nameCol === -1) nameCol = 0;
             if (leagueCol === -1) leagueCol = 1;
             if (divisionCol === -1) divisionCol = 2;
             if (countryCol === -1) countryCol = 3;
+            if (ratingCol === -1) ratingCol = 4;
 
             // Check if row 0 or 1 is a title row
             if (headerRowIndex === -1) {
@@ -444,6 +455,9 @@ class DatabaseService {
                 headerRowIndex = 1; // row 1 is header (0-indexed 1) or row 2 is data
               }
             }
+          } else if (ratingCol === -1) {
+            // If header was found but GER column wasn't explicitly named, fallback to column 4 (Col E) if available
+            ratingCol = 4;
           }
 
           const startRow = headerRowIndex !== -1 ? headerRowIndex + 1 : 0;
@@ -453,7 +467,7 @@ class DatabaseService {
             let row = rawRows[i];
             if (!row || !Array.isArray(row) || row.length === 0) continue;
 
-            // Handle single cell delimited strings (e.g. "Real Madrid; Espanha; LALIGA; 1ª Divisão")
+            // Handle single cell delimited strings (e.g. "Real Madrid; Espanha; LALIGA; 1ª Divisão; 83")
             if (row.length === 1 && typeof row[0] === 'string' && (row[0].includes(';') || row[0].includes(',') || row[0].includes('|') || row[0].includes('\t'))) {
               const delimiter = row[0].includes(';') ? ';' : row[0].includes('\t') ? '\t' : row[0].includes('|') ? '|' : ',';
               row = row[0].split(delimiter).map((s: string) => s.trim());
@@ -470,10 +484,16 @@ class DatabaseService {
             const pais = getCell(countryCol);
             const liga = getCell(leagueCol);
             const divisao = getCell(divisionCol);
+            const gerRaw = getCell(ratingCol);
 
             // Skip header repeat rows or empty names
             if (!nome || normalize(nome) === 'clube' || normalize(nome) === 'club' || normalize(nome) === 'nome') {
               continue;
+            }
+
+            let parsedRating = parseInt(gerRaw, 10);
+            if (isNaN(parsedRating) || parsedRating < 10 || parsedRating > 99) {
+              parsedRating = 80;
             }
 
             importedClubs.push({
@@ -483,7 +503,7 @@ class DatabaseService {
               liga: liga || 'Liga Geral',
               divisao: divisao || '1ª Divisão',
               badgeColor: this.generateRandomColor(nome),
-              rating: 80,
+              rating: parsedRating,
             });
           }
 

@@ -84,7 +84,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated
             Estrutura obrigatória da planilha Excel
           </h4>
           <p className="text-xs text-gray-400 mb-3">
-            O arquivo deve conter as colunas: <span className="text-white font-mono font-bold">| Clube | Liga | Divisão | País |</span>
+            O arquivo deve conter as colunas: <span className="text-white font-mono font-bold">| Clube | Liga | Divisão | País | GER |</span>
           </p>
 
           <div className="overflow-x-auto">
@@ -95,6 +95,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated
                   <th className="py-2 px-3">Liga</th>
                   <th className="py-2 px-3">Divisão</th>
                   <th className="py-2 px-3">País</th>
+                  <th className="py-2 px-3">GER</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
@@ -103,18 +104,21 @@ export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated
                   <td className="py-1.5 px-3">2. Bundesliga</td>
                   <td className="py-1.5 px-3">2ª Divisão</td>
                   <td className="py-1.5 px-3">Alemanha</td>
+                  <td className="py-1.5 px-3 text-amber-300 font-bold">69</td>
                 </tr>
                 <tr>
                   <td className="py-1.5 px-3 text-white font-semibold">Real Madrid</td>
                   <td className="py-1.5 px-3">LALIGA EA SPORTS</td>
                   <td className="py-1.5 px-3">1ª Divisão</td>
                   <td className="py-1.5 px-3">Espanha</td>
+                  <td className="py-1.5 px-3 text-amber-300 font-bold">83</td>
                 </tr>
                 <tr>
                   <td className="py-1.5 px-3 text-white font-semibold">Flamengo</td>
                   <td className="py-1.5 px-3">Brasileirão Série A</td>
                   <td className="py-1.5 px-3">Série A</td>
                   <td className="py-1.5 px-3">Brasil</td>
+                  <td className="py-1.5 px-3 text-amber-300 font-bold">79</td>
                 </tr>
               </tbody>
             </table>
