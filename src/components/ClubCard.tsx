@@ -1,5 +1,6 @@
 import React from 'react';
 import { Club } from '../types';
+import { getLeagueLogo } from '../services/leagueLogos';
 import { Trophy, Shield, Globe, MapPin } from 'lucide-react';
 
 interface ClubCardProps {
@@ -113,7 +114,16 @@ export const ClubCard: React.FC<ClubCardProps> = ({
       {/* League & Division */}
       <div className="w-full mt-3 pt-2 border-t border-amber-400/20 flex flex-col gap-1 text-xs">
         <div className="flex items-center justify-center gap-1.5 text-amber-100/90 font-medium">
-          <Globe className="w-3.5 h-3.5 text-[#00FF85]" />
+          {getLeagueLogo(club.liga) ? (
+            <img
+              src={getLeagueLogo(club.liga)}
+              alt={club.liga}
+              className="w-4 h-4 object-contain shrink-0 filter drop-shadow"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <Globe className="w-3.5 h-3.5 text-[#00FF85]" />
+          )}
           <span className="truncate">{club.liga}</span>
         </div>
 

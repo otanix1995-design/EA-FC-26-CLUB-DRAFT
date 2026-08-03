@@ -3,7 +3,10 @@ import { Settings, Language, Club } from '../types';
 import { db } from '../services/db';
 import { audio } from '../services/audio';
 import { getTranslation } from '../services/i18n';
-import { Settings as SettingsIcon, Moon, Sun, Volume2, VolumeX, Smartphone, Timer, Globe, Trash2, AlertTriangle, Filter, Check } from 'lucide-react';
+import { getCountryFlag } from '../components/RouletteWheel';
+import { getLeagueLogo } from '../services/leagueLogos';
+import { LeagueLogosModal } from '../components/LeagueLogosModal';
+import { Settings as SettingsIcon, Moon, Sun, Volume2, VolumeX, Smartphone, Timer, Globe, Trash2, AlertTriangle, Filter, Check, Trophy } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: Settings;
@@ -19,15 +22,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onResetDatabase,
 }) => {
   const [showClearModal, setShowClearModal] = useState(false);
+  const [showLeagueLogosModal, setShowLeagueLogosModal] = useState(false);
   const lang = settings.language || 'pt';
 
-  // Extract unique divisions from clubs
+  // Extract unique divisions, leagues and countries from clubs
   const allDivisions = useMemo(() => {
     const set = new Set<string>();
     clubs.forEach((c) => {
       if (c.divisao) set.add(c.divisao);
     });
     return Array.from(set).sort();
+  }, [clubs]);
+
+  const allLeagues = useMemo(() => {
+    const set = new Set<string>();
+    clubs.forEach((c) => {
+      if (c.liga && c.liga.trim()) set.add(c.liga.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [clubs]);
+
+  const allCountries = useMemo(() => {
+    const set = new Set<string>();
+    clubs.forEach((c) => {
+      if (c.pais && c.pais.trim()) set.add(c.pais.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [clubs]);
 
   const toggleDivisionDefault = (divName: string) => {
@@ -39,6 +59,44 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       updated = [...currentExcluded, divName];
     }
     onUpdateSettings({ ...settings, excludedDivisions: updated });
+  };
+
+  const toggleLeagueDefault = (leagueName: string) => {
+    const currentExcluded = settings.excludedLeagues || [];
+    let updated: string[];
+    if (currentExcluded.includes(leagueName)) {
+      updated = currentExcluded.filter((l) => l !== leagueName);
+    } else {
+      updated = [...currentExcluded, leagueName];
+    }
+    onUpdateSettings({ ...settings, excludedLeagues: updated });
+  };
+
+  const toggleCountryDefault = (countryName: string) => {
+    const currentExcluded = settings.excludedCountries || [];
+    let updated: string[];
+    if (currentExcluded.includes(countryName)) {
+      updated = currentExcluded.filter((c) => c !== countryName);
+    } else {
+      updated = [...currentExcluded, countryName];
+    }
+    onUpdateSettings({ ...settings, excludedCountries: updated });
+  };
+
+  const enableAllLeagues = () => {
+    onUpdateSettings({ ...settings, excludedLeagues: [] });
+  };
+
+  const disableAllLeagues = () => {
+    onUpdateSettings({ ...settings, excludedLeagues: allLeagues });
+  };
+
+  const enableAllCountries = () => {
+    onUpdateSettings({ ...settings, excludedCountries: [] });
+  };
+
+  const disableAllCountries = () => {
+    onUpdateSettings({ ...settings, excludedCountries: allCountries });
   };
 
   const handleSoundToggle = () => {
@@ -248,6 +306,150 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           )}
 
+          {/* Default League Filter Settings */}
+          {allLeagues.length > 0 && (
+            <div className="p-4 bg-[#0a0b0e] border border-gray-800 rounded-2xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-cyan-400" />
+                    <span className="font-bold text-sm text-white">Filtro de Ligas no Sorteio</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Desative ligas do sorteio sem apagar os clubes do banco de dados (ex: se uma liga sair do jogo, pode ser ocultada temporariamente).
+                  </p>
+                </div>
+
+                {/* Bulk Enable / Disable */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={enableAllLeagues}
+                    className="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-[11px] font-bold text-emerald-400 border border-gray-700 transition-colors cursor-pointer"
+                  >
+                    Ativar Todas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={disableAllLeagues}
+                    className="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-[11px] font-bold text-gray-400 border border-gray-700 transition-colors cursor-pointer"
+                  >
+                    Desativar Todas
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto pt-1 pr-1 custom-scrollbar">
+                {allLeagues.map((leagueName) => {
+                  const isExcluded = (settings.excludedLeagues || []).includes(leagueName);
+                  const isEnabled = !isExcluded;
+                  const logo = getLeagueLogo(leagueName);
+
+                  return (
+                    <button
+                      key={leagueName}
+                      type="button"
+                      onClick={() => toggleLeagueDefault(leagueName)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border cursor-pointer ${
+                        isEnabled
+                          ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/50 shadow-sm'
+                          : 'bg-[#12151c] text-gray-500 border-gray-800 line-through opacity-50'
+                      }`}
+                    >
+                      {logo ? (
+                        <img src={logo} alt={leagueName} className="w-4 h-4 object-contain" referrerPolicy="no-referrer" />
+                      ) : null}
+                      <span>{leagueName}</span>
+                      {isEnabled ? <Check className="w-3 h-3 text-cyan-400 ml-0.5" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Default Country Filter Settings */}
+          {allCountries.length > 0 && (
+            <div className="p-4 bg-[#0a0b0e] border border-gray-800 rounded-2xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-emerald-400" />
+                    <span className="font-bold text-sm text-white">Filtro de Países no Sorteio</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Ative ou desative países específicos do sorteio aleatório sem excluir seus clubes.
+                  </p>
+                </div>
+
+                {/* Bulk Enable / Disable */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={enableAllCountries}
+                    className="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-[11px] font-bold text-emerald-400 border border-gray-700 transition-colors cursor-pointer"
+                  >
+                    Ativar Todos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={disableAllCountries}
+                    className="px-2.5 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-[11px] font-bold text-gray-400 border border-gray-700 transition-colors cursor-pointer"
+                  >
+                    Desativar Todos
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 max-h-56 overflow-y-auto pt-1 pr-1 custom-scrollbar">
+                {allCountries.map((countryName) => {
+                  const isExcluded = (settings.excludedCountries || []).includes(countryName);
+                  const isEnabled = !isExcluded;
+                  const flag = getCountryFlag(countryName);
+
+                  return (
+                    <button
+                      key={countryName}
+                      type="button"
+                      onClick={() => toggleCountryDefault(countryName)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border cursor-pointer ${
+                        isEnabled
+                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/50 shadow-sm'
+                          : 'bg-[#12151c] text-gray-500 border-gray-800 line-through opacity-50'
+                      }`}
+                    >
+                      <span>{flag}</span>
+                      <span>{countryName}</span>
+                      {isEnabled ? <Check className="w-3 h-3 text-emerald-400 ml-0.5" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* League Logos Management Card */}
+          <div className="p-4 bg-[#0a0b0e] border border-gray-800 rounded-2xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 shrink-0">
+                <Trophy className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="block font-bold text-sm text-white truncate">Logos Oficiais das Ligas</span>
+                <span className="text-xs text-gray-500 truncate block">Personalizar, enviar imagens ou importar mapeamentos JSON</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              id="settings-manage-league-logos-btn"
+              onClick={() => setShowLeagueLogosModal(true)}
+              className="py-2.5 px-4 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0"
+            >
+              Gerenciar
+            </button>
+          </div>
+
           {/* Clear Database Danger Button */}
           <div className="pt-4 border-t border-gray-800">
             <button
@@ -295,6 +497,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+      {/* Modal for League Logos */}
+      {showLeagueLogosModal && (
+        <LeagueLogosModal
+          settings={settings}
+          clubs={clubs}
+          onClose={() => setShowLeagueLogosModal(false)}
+          onUpdate={() => {}}
+        />
       )}
     </div>
   );

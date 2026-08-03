@@ -14,7 +14,76 @@ export const defaultSettings: Settings = {
   rouletteTime: 8,
   language: 'pt',
   excludedDivisions: [],
+  excludedLeagues: [],
+  excludedCountries: [],
 };
+
+function removeAccents(str: string): string {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+const OFFICIAL_COUNTRIES_FC26 = new Set([
+  'alemanha',
+  'germany',
+  'argentina',
+  'arabia saudita',
+  'saudi arabia',
+  'australia',
+  'belgica',
+  'belgium',
+  'china',
+  'coreia do sul',
+  'coréia do sul',
+  'coreia',
+  'korea',
+  'south korea',
+  'dinamarca',
+  'denmark',
+  'escocia',
+  'scotland',
+  'espanha',
+  'spain',
+  'estados unidos',
+  'eua',
+  'usa',
+  'united states',
+  'franca',
+  'france',
+  'inglaterra',
+  'england',
+  'reino unido',
+  'uk',
+  'irlanda',
+  'ireland',
+  'rep. da irlanda',
+  'republic of ireland',
+  'italia',
+  'italy',
+  'noruega',
+  'norway',
+  'paises baixos',
+  'holanda',
+  'netherlands',
+  'polonia',
+  'poland',
+  'portugal',
+  'romenia',
+  'romania',
+  'suecia',
+  'sweden',
+  'suica',
+  'switzerland',
+  'turquia',
+  'turkey',
+  'austria',
+  'india',
+]);
+
+export function isOfficialFcCountry(countryStr: string): boolean {
+  if (!countryStr) return false;
+  const normalized = removeAccents(countryStr.trim().toLowerCase());
+  return OFFICIAL_COUNTRIES_FC26.has(normalized);
+}
 
 export function sanitizeClub(c: Club): Club {
   let nome = (c.nome || '').trim();
@@ -56,14 +125,84 @@ export function sanitizeClub(c: Club): Club {
     divisao = realDivisao;
   }
 
+  nome = nome || 'Clube';
+  divisao = divisao || '1ª Divisão';
+
+  // Apply EA FC 26 Resto do Mundo rule:
+  // If the country is not one of the 25 official countries with licensed leagues,
+  // classify country as "Resto do Mundo" and league as "LIGA CLÁSICA E RDM masculina"
+  if (!pais || !isOfficialFcCountry(pais)) {
+    pais = 'Resto do Mundo';
+    liga = 'LIGA CLÁSICA E RDM masculina';
+  } else {
+    liga = liga || 'Liga Geral';
+  }
+
   return {
     ...c,
-    nome: nome || 'Clube',
-    pais: pais || 'Internacional',
-    liga: liga || 'Liga Geral',
-    divisao: divisao || '1ª Divisão',
-    logoUrl: c.logoUrl || getKnownClubLogo(nome || ''),
+    nome,
+    pais,
+    liga,
+    divisao,
+    logoUrl: c.logoUrl || getKnownClubLogo(nome),
   };
+}
+
+export function disambiguateLeagues(clubs: Club[]): { clubs: Club[]; mutated: boolean } {
+  const leagueCountriesMap = new Map<string, Set<string>>();
+
+  const multiCountryExemptions = new Set([
+    'mls',
+    'major league soccer',
+    'uefa champions league',
+    'champions league',
+    'uefa europa league',
+    'europa league',
+    'conmebol libertadores',
+    'libertadores',
+    'copa libertadores',
+    'a-league',
+    'a-league men',
+    'rest of world',
+    'resto do mundo',
+  ]);
+
+  clubs.forEach((c) => {
+    const l = (c.liga || '').trim();
+    const p = (c.pais || '').trim();
+    if (!l || !p) return;
+    const lowerL = l.toLowerCase();
+    if (multiCountryExemptions.has(lowerL)) return;
+
+    if (!leagueCountriesMap.has(lowerL)) {
+      leagueCountriesMap.set(lowerL, new Set());
+    }
+    leagueCountriesMap.get(lowerL)!.add(p);
+  });
+
+  let mutated = false;
+  const updatedClubs = clubs.map((c) => {
+    const l = (c.liga || '').trim();
+    const p = (c.pais || '').trim();
+    if (!l || !p) return c;
+
+    const lowerL = l.toLowerCase();
+    const countries = leagueCountriesMap.get(lowerL);
+
+    if (countries && countries.size > 1 && !multiCountryExemptions.has(lowerL)) {
+      const hasCountryInName = l.toLowerCase().includes(`(${p.toLowerCase()})`);
+      if (!hasCountryInName) {
+        mutated = true;
+        return {
+          ...c,
+          liga: `${l} (${p})`,
+        };
+      }
+    }
+    return c;
+  });
+
+  return { clubs: updatedClubs, mutated };
 }
 
 class DatabaseService {
@@ -90,20 +229,37 @@ class DatabaseService {
         return s;
       });
 
-      if (mutated) {
-        this.saveClubs(sanitized);
+      // Disambiguate leagues with same name in different countries (e.g. División Profesional in Bolivia vs Paraguay)
+      const { clubs: disambiguatedClubs, mutated: disMutated } = disambiguateLeagues(sanitized);
+      if (disMutated) {
+        mutated = true;
       }
 
-      return sanitized;
+      // Filter out any leftover Brazilian clubs from earlier default seeds
+      const filtered = disambiguatedClubs.filter(
+        (c) => c.pais.trim().toLowerCase() !== 'brasil' && !c.liga.trim().toLowerCase().includes('brasileir')
+      );
+      if (filtered.length !== disambiguatedClubs.length) {
+        mutated = true;
+      }
+
+      if (mutated) {
+        this.saveClubs(filtered);
+      }
+
+      return filtered;
     } catch {
       return DEFAULT_CLUBS.map(sanitizeClub);
     }
   }
 
   public saveClubs(clubs: Club[]): void {
+    // Disambiguate leagues with same generic name in different countries
+    const { clubs: disambiguated } = disambiguateLeagues(clubs.map(sanitizeClub));
+
     // Remove duplicates based on lowercased club name & league
     const uniqueMap = new Map<string, Club>();
-    clubs.map(sanitizeClub).forEach((c) => {
+    disambiguated.forEach((c) => {
       const key = `${c.nome.trim().toLowerCase()}_${c.liga.trim().toLowerCase()}`;
       if (!uniqueMap.has(key)) {
         uniqueMap.set(key, {

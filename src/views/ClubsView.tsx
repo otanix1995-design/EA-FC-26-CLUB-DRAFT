@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Club, Settings } from '../types';
 import { getTranslation } from '../services/i18n';
+import { getLeagueLogo } from '../services/leagueLogos';
+import { LeagueLogosModal } from '../components/LeagueLogosModal';
 import {
   Shield,
   Search,
@@ -64,6 +66,8 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isLeagueLogosModalOpen, setIsLeagueLogosModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [editingClub, setEditingClub] = useState<Club | null>(null);
   const [deletingClub, setDeletingClub] = useState<Club | null>(null);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
@@ -243,6 +247,17 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              id="btn-open-league-logos-modal"
+              onClick={() => setIsLeagueLogosModalOpen(true)}
+              className="py-3 px-4 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs transition-all border border-amber-500/40 hover:border-amber-400 flex items-center gap-2 cursor-pointer shadow-lg shadow-amber-500/10"
+              title="Gerenciar escudos oficiais das ligas"
+            >
+              <Trophy className="w-4 h-4 text-amber-400" />
+              <span>{getTranslation(lang, 'manageLeagueLogos')}</span>
+            </button>
+
             <button
               type="button"
               id="btn-open-add-club-modal"
@@ -430,6 +445,14 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
                     {club.nome}
                   </h4>
                   <div className="flex items-center gap-1.5 text-[11px] text-gray-400 truncate mt-0.5">
+                    {getLeagueLogo(club.liga) ? (
+                      <img
+                        src={getLeagueLogo(club.liga)}
+                        alt={club.liga}
+                        className="w-3.5 h-3.5 object-contain shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : null}
                     <span className="truncate">{club.liga}</span>
                     <span className="text-gray-600">•</span>
                     <span className="text-[#00FF85] shrink-0 font-mono font-bold text-[10px]">
@@ -799,6 +822,16 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL: LEAGUE LOGOS MANAGER */}
+      {isLeagueLogosModalOpen && (
+        <LeagueLogosModal
+          settings={settings}
+          clubs={clubs}
+          onClose={() => setIsLeagueLogosModalOpen(false)}
+          onUpdate={() => setRefreshKey((k) => k + 1)}
+        />
       )}
     </div>
   );

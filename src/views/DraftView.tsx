@@ -3,7 +3,9 @@ import { Club, Series, Settings } from '../types';
 import { RouletteWheel } from '../components/RouletteWheel';
 import { ClubCard } from '../components/ClubCard';
 import { getTranslation } from '../services/i18n';
-import { Swords, CheckCircle2, Play, Sparkles, Filter, ChevronDown, ChevronUp, Check, Shield, RefreshCw } from 'lucide-react';
+import { getCountryFlag } from '../components/RouletteWheel';
+import { getLeagueLogo } from '../services/leagueLogos';
+import { Swords, CheckCircle2, Play, Sparkles, Filter, ChevronDown, ChevronUp, Check, Shield, RefreshCw, Trophy, Globe } from 'lucide-react';
 
 interface DraftViewProps {
   series: Series;
@@ -12,6 +14,11 @@ interface DraftViewProps {
   onConfirmDraftP1: (club: Club) => void;
   onConfirmDraftP2: (club: Club) => void;
   onStartMatch: () => void;
+  onUpdateSeriesFilters?: (filters: {
+    excludedDivisions?: string[];
+    excludedLeagues?: string[];
+    excludedCountries?: string[];
+  }) => void;
   onUpdateExcludedDivisions?: (newExcluded: string[]) => void;
 }
 
@@ -22,11 +29,13 @@ export const DraftView: React.FC<DraftViewProps> = ({
   onConfirmDraftP1,
   onConfirmDraftP2,
   onStartMatch,
+  onUpdateSeriesFilters,
   onUpdateExcludedDivisions,
 }) => {
   const [draftedP1Club, setDraftedP1Club] = useState<Club | null>(series.currentP1Club || null);
   const [draftedP2Club, setDraftedP2Club] = useState<Club | null>(series.currentP2Club || null);
   const [showFilterBar, setShowFilterBar] = useState(false);
+  const [activeFilterTab, setActiveFilterTab] = useState<'leagues' | 'countries' | 'divisions'>('leagues');
 
   const [rejectedP1ClubIds, setRejectedP1ClubIds] = useState<string[]>([]);
   const [rejectedP2ClubIds, setRejectedP2ClubIds] = useState<string[]>([]);
@@ -45,7 +54,7 @@ export const DraftView: React.FC<DraftViewProps> = ({
 
   const lang = settings.language || 'pt';
 
-  // Extract unique divisions from all clubs
+  // Extract unique metadata from all clubs
   const allDivisions = useMemo(() => {
     const set = new Set<string>();
     clubs.forEach((c) => {
@@ -54,30 +63,90 @@ export const DraftView: React.FC<DraftViewProps> = ({
     return Array.from(set).sort();
   }, [clubs]);
 
-  // Filter eligible clubs based on series.excludedDivisions
+  const allLeagues = useMemo(() => {
+    const set = new Set<string>();
+    clubs.forEach((c) => {
+      if (c.liga && c.liga.trim()) set.add(c.liga.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [clubs]);
+
+  const allCountries = useMemo(() => {
+    const set = new Set<string>();
+    clubs.forEach((c) => {
+      if (c.pais && c.pais.trim()) set.add(c.pais.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [clubs]);
+
+  // Filter eligible clubs based on excluded Divisions, Leagues, and Countries
   const eligibleClubs = useMemo(() => {
-    const excluded = series.excludedDivisions || [];
-    if (excluded.length === 0) return clubs;
-    const filtered = clubs.filter((c) => !excluded.includes(c.divisao || '1ª Divisão'));
+    const excludedDivs = series.excludedDivisions || [];
+    const excludedLegs = series.excludedLeagues || [];
+    const excludedCouns = series.excludedCountries || [];
+
+    let filtered = clubs;
+    if (excludedDivs.length > 0) {
+      filtered = filtered.filter((c) => !excludedDivs.includes(c.divisao || '1ª Divisão'));
+    }
+    if (excludedLegs.length > 0) {
+      filtered = filtered.filter((c) => !excludedLegs.includes(c.liga));
+    }
+    if (excludedCouns.length > 0) {
+      filtered = filtered.filter((c) => !excludedCouns.includes(c.pais));
+    }
+
     return filtered.length > 0 ? filtered : clubs;
-  }, [clubs, series.excludedDivisions]);
+  }, [clubs, series.excludedDivisions, series.excludedLeagues, series.excludedCountries]);
+
+  const updateFilters = (newDivs?: string[], newLegs?: string[], newCouns?: string[]) => {
+    const nextDivs = newDivs !== undefined ? newDivs : (series.excludedDivisions || []);
+    const nextLegs = newLegs !== undefined ? newLegs : (series.excludedLeagues || []);
+    const nextCouns = newCouns !== undefined ? newCouns : (series.excludedCountries || []);
+
+    if (onUpdateSeriesFilters) {
+      onUpdateSeriesFilters({
+        excludedDivisions: nextDivs,
+        excludedLeagues: nextLegs,
+        excludedCountries: nextCouns,
+      });
+    } else if (onUpdateExcludedDivisions) {
+      onUpdateExcludedDivisions(nextDivs);
+    }
+  };
 
   const toggleDivisionFilter = (divName: string) => {
-    if (!onUpdateExcludedDivisions) return;
     const currentExcluded = series.excludedDivisions || [];
     let updated: string[];
-
     if (currentExcluded.includes(divName)) {
-      // Remove from excluded (enable division)
       updated = currentExcluded.filter((d) => d !== divName);
     } else {
-      // Add to excluded (disable division)
-      // Prevent excluding all
       if (currentExcluded.length >= allDivisions.length - 1) return;
       updated = [...currentExcluded, divName];
     }
+    updateFilters(updated, undefined, undefined);
+  };
 
-    onUpdateExcludedDivisions(updated);
+  const toggleLeagueFilter = (leagueName: string) => {
+    const currentExcluded = series.excludedLeagues || [];
+    let updated: string[];
+    if (currentExcluded.includes(leagueName)) {
+      updated = currentExcluded.filter((l) => l !== leagueName);
+    } else {
+      updated = [...currentExcluded, leagueName];
+    }
+    updateFilters(undefined, updated, undefined);
+  };
+
+  const toggleCountryFilter = (countryName: string) => {
+    const currentExcluded = series.excludedCountries || [];
+    let updated: string[];
+    if (currentExcluded.includes(countryName)) {
+      updated = currentExcluded.filter((c) => c !== countryName);
+    } else {
+      updated = [...currentExcluded, countryName];
+    }
+    updateFilters(undefined, undefined, updated);
   };
 
   // Excluded clubs in current match/series (including rejected missing clubs)
@@ -145,53 +214,202 @@ export const DraftView: React.FC<DraftViewProps> = ({
           <span className="text-[#00FF85]">• Jogo {series.currentMatchIndex + 1} de {series.format}</span>
         </div>
 
-        {/* Division Filter Quick Bar (Only shown during spin steps) */}
+        {/* Filter Quick Bar (Only shown during spin steps) */}
         {(step === 'spin_p1' || step === 'spin_p2') && (
-          <div className="w-full max-w-lg mt-1">
+          <div className="w-full max-w-xl mt-1">
             <button
               type="button"
               onClick={() => setShowFilterBar(!showFilterBar)}
-              className="mx-auto py-1.5 px-3 rounded-xl bg-[#12151c] border border-gray-800 hover:border-[#00FF85]/40 text-xs font-bold text-gray-300 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              className="mx-auto py-1.5 px-3.5 rounded-xl bg-[#12151c] border border-gray-800 hover:border-[#00FF85]/40 text-xs font-bold text-gray-300 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
             >
               <Filter className="w-3.5 h-3.5 text-amber-400" />
               <span>
-                {getTranslation(lang, 'filterDivisions')}:{' '}
-                <strong className="text-[#00FF85]">
-                  {allDivisions.length - (series.excludedDivisions?.length || 0)}/{allDivisions.length}
-                </strong>{' '}
-                ({eligibleClubs.length} {getTranslation(lang, 'club')}{eligibleClubs.length !== 1 ? 's' : ''})
+                Filtros do Sorteio: <strong className="text-[#00FF85]">{eligibleClubs.length} clubes elegíveis</strong>
               </span>
-              {showFilterBar ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {showFilterBar ? <ChevronUp className="w-3.5 h-3.5 text-[#00FF85]" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
 
-            {/* Expanded Division Filter Pills */}
+            {/* Expanded Multi-Tab Filter Bar */}
             {showFilterBar && (
-              <div className="mt-2 p-3 bg-[#0a0b0e] border border-gray-800 rounded-2xl animate-fadeIn shadow-xl text-left">
-                <span className="block text-[10px] font-bold uppercase text-gray-400 mb-2">
-                  Clique para ativar / desativar divisões no sorteio:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {allDivisions.map((divName) => {
-                    const isExcluded = (series.excludedDivisions || []).includes(divName);
-                    const isEnabled = !isExcluded;
+              <div className="mt-2.5 p-3.5 bg-[#0a0b0e] border border-gray-800 rounded-2xl animate-fadeIn shadow-2xl text-left space-y-3">
+                {/* Tabs */}
+                <div className="flex items-center gap-1.5 border-b border-gray-800 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilterTab('leagues')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeFilterTab === 'leagues'
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Trophy className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Ligas ({allLeagues.length - (series.excludedLeagues?.length || 0)})</span>
+                  </button>
 
-                    return (
-                      <button
-                        key={divName}
-                        type="button"
-                        onClick={() => toggleDivisionFilter(divName)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border cursor-pointer ${
-                          isEnabled
-                            ? 'bg-[#00FF85]/15 text-[#00FF85] border-[#00FF85]/50'
-                            : 'bg-[#12151c] text-gray-500 border-gray-800 line-through opacity-60'
-                        }`}
-                      >
-                        {isEnabled ? <Check className="w-3 h-3 text-[#00FF85]" /> : null}
-                        <span>{divName}</span>
-                      </button>
-                    );
-                  })}
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilterTab('countries')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeFilterTab === 'countries'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Países ({allCountries.length - (series.excludedCountries?.length || 0)})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilterTab('divisions')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeFilterTab === 'divisions'
+                        ? 'bg-[#00FF85]/20 text-[#00FF85] border border-[#00FF85]/50'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Filter className="w-3.5 h-3.5 text-[#00FF85]" />
+                    <span>Divisões ({allDivisions.length - (series.excludedDivisions?.length || 0)})</span>
+                  </button>
                 </div>
+
+                {/* Tab Content: Leagues */}
+                {activeFilterTab === 'leagues' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-bold uppercase text-gray-400">
+                        Ativar ou desativar ligas no sorteio:
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateFilters(undefined, [], undefined)}
+                          className="text-[10px] font-bold text-cyan-400 hover:underline cursor-pointer"
+                        >
+                          Ativar Todas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateFilters(undefined, allLeagues, undefined)}
+                          className="text-[10px] font-bold text-gray-500 hover:underline cursor-pointer"
+                        >
+                          Desativar Todas
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                      {allLeagues.map((leagueName) => {
+                        const isExcluded = (series.excludedLeagues || []).includes(leagueName);
+                        const isEnabled = !isExcluded;
+                        const logo = getLeagueLogo(leagueName);
+
+                        return (
+                          <button
+                            key={leagueName}
+                            type="button"
+                            onClick={() => toggleLeagueFilter(leagueName)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                              isEnabled
+                                ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/50'
+                                : 'bg-[#12151c] text-gray-500 border-gray-800 line-through opacity-50'
+                            }`}
+                          >
+                            {logo ? (
+                              <img src={logo} alt={leagueName} className="w-3.5 h-3.5 object-contain" referrerPolicy="no-referrer" />
+                            ) : null}
+                            <span>{leagueName}</span>
+                            {isEnabled ? <Check className="w-3 h-3 text-cyan-400" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab Content: Countries */}
+                {activeFilterTab === 'countries' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-bold uppercase text-gray-400">
+                        Ativar ou desativar países no sorteio:
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateFilters(undefined, undefined, [])}
+                          className="text-[10px] font-bold text-emerald-400 hover:underline cursor-pointer"
+                        >
+                          Ativar Todos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateFilters(undefined, undefined, allCountries)}
+                          className="text-[10px] font-bold text-gray-500 hover:underline cursor-pointer"
+                        >
+                          Desativar Todos
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                      {allCountries.map((countryName) => {
+                        const isExcluded = (series.excludedCountries || []).includes(countryName);
+                        const isEnabled = !isExcluded;
+                        const flag = getCountryFlag(countryName);
+
+                        return (
+                          <button
+                            key={countryName}
+                            type="button"
+                            onClick={() => toggleCountryFilter(countryName)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                              isEnabled
+                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/50'
+                                : 'bg-[#12151c] text-gray-500 border-gray-800 line-through opacity-50'
+                            }`}
+                          >
+                            <span>{flag}</span>
+                            <span>{countryName}</span>
+                            {isEnabled ? <Check className="w-3 h-3 text-emerald-400" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab Content: Divisions */}
+                {activeFilterTab === 'divisions' && (
+                  <div>
+                    <span className="block text-[10px] font-bold uppercase text-gray-400 mb-2">
+                      Ativar ou desativar divisões no sorteio:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {allDivisions.map((divName) => {
+                        const isExcluded = (series.excludedDivisions || []).includes(divName);
+                        const isEnabled = !isExcluded;
+
+                        return (
+                          <button
+                            key={divName}
+                            type="button"
+                            onClick={() => toggleDivisionFilter(divName)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border cursor-pointer ${
+                              isEnabled
+                                ? 'bg-[#00FF85]/15 text-[#00FF85] border-[#00FF85]/50'
+                                : 'bg-[#12151c] text-gray-500 border-gray-800 line-through opacity-60'
+                            }`}
+                          >
+                            {isEnabled ? <Check className="w-3 h-3 text-[#00FF85]" /> : null}
+                            <span>{divName}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

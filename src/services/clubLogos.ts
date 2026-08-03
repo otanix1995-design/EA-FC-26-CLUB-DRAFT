@@ -51,21 +51,6 @@ export const KNOWN_CLUB_LOGOS: Record<string, string> = {
   'olympique lyonnais': 'https://upload.wikimedia.org/wikipedia/en/c/c6/Olympique_Lyonnais.svg',
   'lille osc': 'https://upload.wikimedia.org/wikipedia/en/6/6f/Lille_OSC_2018_logo.svg',
 
-  // Brasil
-  'flamengo': 'https://upload.wikimedia.org/wikipedia/commons/2/2e/Flamengo_brazilian_matching_shield.svg',
-  'palmeiras': 'https://upload.wikimedia.org/wikipedia/commons/1/10/Palmeiras_logo.svg',
-  'atlético mineiro': 'https://upload.wikimedia.org/wikipedia/commons/5/5f/Atletico_mineiro_galo.png',
-  'são paulo fc': 'https://upload.wikimedia.org/wikipedia/commons/6/6f/Brasao_do_Sao_Paulo_Futebol_Clube.svg',
-  'botafogo': 'https://upload.wikimedia.org/wikipedia/commons/5/52/Botafogo_de_Futebol_e_Regatas_logo.svg',
-  'fluminense': 'https://upload.wikimedia.org/wikipedia/commons/a/ad/Fluminense_FC_shield.svg',
-  'internacional': 'https://upload.wikimedia.org/wikipedia/commons/f/f1/Escudo_do_Sport_Club_Internacional.svg',
-  'grêmio': 'https://upload.wikimedia.org/wikipedia/commons/7/7b/Gremio_logo.svg',
-  'corinthians': 'https://upload.wikimedia.org/wikipedia/commons/5/5a/Sport_Club_Corinthians_Paulista_crest.svg',
-  'cruzeiro': 'https://upload.wikimedia.org/wikipedia/commons/9/90/Cruzeiro_Esporte_Clube_%28logo_2021%29.svg',
-  'santos fc': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Santos_Logo.png',
-  'santos': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Santos_Logo.png',
-  'vasco da gama': 'https://upload.wikimedia.org/wikipedia/commons/c/c9/Vasco_da_Gama_crest.svg',
-
   // Outros
   'al hilal': 'https://upload.wikimedia.org/wikipedia/en/a/a2/Al_Hilal_SFC_Logo.svg',
   'al nassr': 'https://upload.wikimedia.org/wikipedia/en/c/c5/Al_Nassr_FC.svg',

@@ -1,12 +1,21 @@
 import React, { useState, useMemo } from 'react';
 import { Settings, SeriesFormat, Club } from '../types';
 import { getTranslation } from '../services/i18n';
-import { User, Swords, ShieldCheck, Play, Filter, Check, X, Shield } from 'lucide-react';
+import { getCountryFlag } from '../components/RouletteWheel';
+import { getLeagueLogo } from '../services/leagueLogos';
+import { User, Swords, ShieldCheck, Play, Filter, Check, Shield, Trophy, Globe } from 'lucide-react';
 
 interface NewSeriesViewProps {
   settings: Settings;
   clubs: Club[];
-  onStartSeries: (p1Name: string, p2Name: string, format: SeriesFormat, excludedDivisions?: string[]) => void;
+  onStartSeries: (
+    p1Name: string,
+    p2Name: string,
+    format: SeriesFormat,
+    excludedDivisions?: string[],
+    excludedLeagues?: string[],
+    excludedCountries?: string[]
+  ) => void;
   onCancel: () => void;
 }
 
@@ -18,10 +27,11 @@ export const NewSeriesView: React.FC<NewSeriesViewProps> = ({
   const [p1Name, setP1Name] = useState('Jogador 1');
   const [p2Name, setP2Name] = useState('Jogador 2');
   const [format, setFormat] = useState<SeriesFormat>(3);
+  const [activeFilterTab, setActiveFilterTab] = useState<'leagues' | 'countries' | 'divisions'>('leagues');
 
   const lang = settings.language || 'pt';
 
-  // Extract unique divisions from available clubs
+  // Extract unique metadata from available clubs
   const allDivisions = useMemo(() => {
     const set = new Set<string>();
     clubs.forEach((c) => {
@@ -30,26 +40,47 @@ export const NewSeriesView: React.FC<NewSeriesViewProps> = ({
     return Array.from(set).sort();
   }, [clubs]);
 
-  // Count clubs per division
-  const divisionCounts = useMemo(() => {
-    const map: Record<string, number> = {};
+  const allLeagues = useMemo(() => {
+    const set = new Set<string>();
     clubs.forEach((c) => {
-      const d = c.divisao || '1ª Divisão';
-      map[d] = (map[d] || 0) + 1;
+      if (c.liga && c.liga.trim()) set.add(c.liga.trim());
     });
-    return map;
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [clubs]);
 
-  // Selected divisions state (default: all divisions except those in settings.excludedDivisions)
+  const allCountries = useMemo(() => {
+    const set = new Set<string>();
+    clubs.forEach((c) => {
+      if (c.pais && c.pais.trim()) set.add(c.pais.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [clubs]);
+
+  // Selected filters states (defaults: all available minus those in settings.excluded*)
   const [selectedDivisions, setSelectedDivisions] = useState<string[]>(() => {
     const excluded = settings.excludedDivisions || [];
     return allDivisions.filter((d) => !excluded.includes(d));
   });
 
+  const [selectedLeagues, setSelectedLeagues] = useState<string[]>(() => {
+    const excluded = settings.excludedLeagues || [];
+    return allLeagues.filter((l) => !excluded.includes(l));
+  });
+
+  const [selectedCountries, setSelectedCountries] = useState<string[]>(() => {
+    const excluded = settings.excludedCountries || [];
+    return allCountries.filter((c) => !excluded.includes(c));
+  });
+
   // Calculate active eligible clubs
   const activeClubsCount = useMemo(() => {
-    return clubs.filter((c) => selectedDivisions.includes(c.divisao || '1ª Divisão')).length;
-  }, [clubs, selectedDivisions]);
+    return clubs.filter((c) => {
+      const isDivOk = selectedDivisions.includes(c.divisao || '1ª Divisão');
+      const isLeagueOk = selectedLeagues.includes(c.liga);
+      const isCountryOk = selectedCountries.includes(c.pais);
+      return isDivOk && isLeagueOk && isCountryOk;
+    }).length;
+  }, [clubs, selectedDivisions, selectedLeagues, selectedCountries]);
 
   const toggleDivision = (divName: string) => {
     if (selectedDivisions.includes(divName)) {
@@ -59,24 +90,34 @@ export const NewSeriesView: React.FC<NewSeriesViewProps> = ({
     }
   };
 
-  const selectAllDivisions = () => {
-    setSelectedDivisions([...allDivisions]);
+  const toggleLeague = (leagueName: string) => {
+    if (selectedLeagues.includes(leagueName)) {
+      setSelectedLeagues(selectedLeagues.filter((l) => l !== leagueName));
+    } else {
+      setSelectedLeagues([...selectedLeagues, leagueName]);
+    }
   };
 
-  const deselectAllDivisions = () => {
-    setSelectedDivisions([]);
+  const toggleCountry = (countryName: string) => {
+    if (selectedCountries.includes(countryName)) {
+      setSelectedCountries(selectedCountries.filter((c) => c !== countryName));
+    } else {
+      setSelectedCountries([...selectedCountries, countryName]);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedDivisions.length === 0) return;
+    if (activeClubsCount === 0) return;
 
     const finalP1 = p1Name.trim() || 'Jogador 1';
     const finalP2 = p2Name.trim() || 'Jogador 2';
 
-    // Excluded divisions are those in allDivisions but not in selectedDivisions
-    const excluded = allDivisions.filter((d) => !selectedDivisions.includes(d));
-    onStartSeries(finalP1, finalP2, format, excluded);
+    const excludedDivisions = allDivisions.filter((d) => !selectedDivisions.includes(d));
+    const excludedLeagues = allLeagues.filter((l) => !selectedLeagues.includes(l));
+    const excludedCountries = allCountries.filter((c) => !selectedCountries.includes(c));
+
+    onStartSeries(finalP1, finalP2, format, excludedDivisions, excludedLeagues, excludedCountries);
   };
 
   const formatOptions: { value: SeriesFormat; labelKey: 'bestOf1' | 'bestOf3' | 'bestOf5' | 'bestOf7'; wins: number }[] = [
@@ -171,74 +212,215 @@ export const NewSeriesView: React.FC<NewSeriesViewProps> = ({
             </div>
           </div>
 
-          {/* Division Filter Section */}
-          <div className="bg-[#0a0b0e] border border-gray-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+          {/* Multi-Tab Filter Section (Ligas, Países, Divisões) */}
+          <div className="bg-[#0a0b0e] border border-gray-800 rounded-2xl p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-800">
+              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Filter className="w-4 h-4" />
-                {getTranslation(lang, 'filterDivisions')}
-              </label>
+                Filtros do Sorteio
+              </span>
 
-              <div className="flex items-center gap-2">
+              {/* Tabs selector */}
+              <div className="flex items-center gap-1 flex-wrap">
                 <button
                   type="button"
-                  onClick={selectAllDivisions}
-                  className="text-[11px] font-bold text-[#00FF85] hover:underline cursor-pointer"
+                  onClick={() => setActiveFilterTab('leagues')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeFilterTab === 'leagues'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
                 >
-                  {getTranslation(lang, 'selectAll')}
+                  <Trophy className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Ligas ({selectedLeagues.length}/{allLeagues.length})</span>
                 </button>
-                <span className="text-gray-600">•</span>
+
                 <button
                   type="button"
-                  onClick={deselectAllDivisions}
-                  className="text-[11px] font-bold text-gray-400 hover:text-white hover:underline cursor-pointer"
+                  onClick={() => setActiveFilterTab('countries')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeFilterTab === 'countries'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
                 >
-                  {getTranslation(lang, 'deselectAll')}
+                  <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Países ({selectedCountries.length}/{allCountries.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveFilterTab('divisions')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeFilterTab === 'divisions'
+                      ? 'bg-[#00FF85]/20 text-[#00FF85] border border-[#00FF85]/50'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Filter className="w-3.5 h-3.5 text-[#00FF85]" />
+                  <span>Divisões ({selectedDivisions.length}/{allDivisions.length})</span>
                 </button>
               </div>
             </div>
 
-            <p className="text-[11px] text-gray-400 mb-3">
-              {getTranslation(lang, 'filterDivisionsHint')}
-            </p>
-
-            {/* Divisions Pill Grid */}
-            <div className="flex flex-wrap gap-2 mb-3">
-              {allDivisions.map((divName) => {
-                const isSelected = selectedDivisions.includes(divName);
-                const count = divisionCounts[divName] || 0;
-
-                return (
-                  <button
-                    key={divName}
-                    type="button"
-                    onClick={() => toggleDivision(divName)}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
-                      isSelected
-                        ? 'bg-[#00FF85]/20 text-[#00FF85] border-[#00FF85]/60 shadow-md shadow-[#00FF85]/10'
-                        : 'bg-[#12151c] text-gray-500 border-gray-800 hover:border-gray-700 hover:text-gray-300'
-                    }`}
-                  >
-                    <div
-                      className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${
-                        isSelected
-                          ? 'bg-[#00FF85] border-[#00FF85] text-black'
-                          : 'border-gray-600'
-                      }`}
+            {/* Tab 1: Leagues */}
+            {activeFilterTab === 'leagues' && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] text-gray-400">
+                    Selecione as ligas que poderão participar do sorteio:
+                  </p>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLeagues([...allLeagues])}
+                      className="text-[11px] font-bold text-cyan-400 hover:underline cursor-pointer"
                     >
-                      {isSelected ? <Check className="w-3 h-3 stroke-[3]" /> : null}
-                    </div>
-                    <span>{divName}</span>
-                    <span className="text-[10px] font-mono opacity-80 bg-black/40 px-1.5 py-0.5 rounded-full">
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                      Marcar Todas
+                    </button>
+                    <span className="text-gray-600">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLeagues([])}
+                      className="text-[11px] font-bold text-gray-400 hover:text-white hover:underline cursor-pointer"
+                    >
+                      Desmarcar Todas
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                  {allLeagues.map((leagueName) => {
+                    const isSelected = selectedLeagues.includes(leagueName);
+                    const logo = getLeagueLogo(leagueName);
+
+                    return (
+                      <button
+                        key={leagueName}
+                        type="button"
+                        onClick={() => toggleLeague(leagueName)}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                          isSelected
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/60 shadow-md shadow-cyan-500/10'
+                            : 'bg-[#12151c] text-gray-500 border-gray-800 hover:border-gray-700 hover:text-gray-300'
+                        }`}
+                      >
+                        {logo ? (
+                          <img src={logo} alt={leagueName} className="w-3.5 h-3.5 object-contain" referrerPolicy="no-referrer" />
+                        ) : null}
+                        <span>{leagueName}</span>
+                        {isSelected ? <Check className="w-3.5 h-3.5 text-cyan-400" /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Countries */}
+            {activeFilterTab === 'countries' && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] text-gray-400">
+                    Selecione os países que poderão participar do sorteio:
+                  </p>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCountries([...allCountries])}
+                      className="text-[11px] font-bold text-emerald-400 hover:underline cursor-pointer"
+                    >
+                      Marcar Todos
+                    </button>
+                    <span className="text-gray-600">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCountries([])}
+                      className="text-[11px] font-bold text-gray-400 hover:text-white hover:underline cursor-pointer"
+                    >
+                      Desmarcar Todos
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                  {allCountries.map((countryName) => {
+                    const isSelected = selectedCountries.includes(countryName);
+                    const flag = getCountryFlag(countryName);
+
+                    return (
+                      <button
+                        key={countryName}
+                        type="button"
+                        onClick={() => toggleCountry(countryName)}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                          isSelected
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/60 shadow-md shadow-emerald-500/10'
+                            : 'bg-[#12151c] text-gray-500 border-gray-800 hover:border-gray-700 hover:text-gray-300'
+                        }`}
+                      >
+                        <span>{flag}</span>
+                        <span>{countryName}</span>
+                        {isSelected ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Tab 3: Divisions */}
+            {activeFilterTab === 'divisions' && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] text-gray-400">
+                    Selecione as divisões que poderão participar do sorteio:
+                  </p>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDivisions([...allDivisions])}
+                      className="text-[11px] font-bold text-[#00FF85] hover:underline cursor-pointer"
+                    >
+                      Marcar Todas
+                    </button>
+                    <span className="text-gray-600">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDivisions([])}
+                      className="text-[11px] font-bold text-gray-400 hover:text-white hover:underline cursor-pointer"
+                    >
+                      Desmarcar Todas
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                  {allDivisions.map((divName) => {
+                    const isSelected = selectedDivisions.includes(divName);
+
+                    return (
+                      <button
+                        key={divName}
+                        type="button"
+                        onClick={() => toggleDivision(divName)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#00FF85]/20 text-[#00FF85] border-[#00FF85]/60 shadow-md shadow-[#00FF85]/10'
+                            : 'bg-[#12151c] text-gray-500 border-gray-800 hover:border-gray-700 hover:text-gray-300'
+                        }`}
+                      >
+                        {isSelected ? <Check className="w-3.5 h-3.5 text-[#00FF85]" /> : null}
+                        <span>{divName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Active Clubs Summary */}
-            <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-800/80">
+            <div className="flex items-center justify-between text-xs pt-3 border-t border-gray-800/80">
               <span className="text-gray-400 flex items-center gap-1 font-medium">
                 <Shield className="w-3.5 h-3.5 text-[#00FF85]" />
                 {getTranslation(lang, 'availableClubsCount')}
@@ -248,9 +430,9 @@ export const NewSeriesView: React.FC<NewSeriesViewProps> = ({
               </span>
             </div>
 
-            {selectedDivisions.length === 0 && (
-              <div className="mt-2 text-xs font-bold text-red-400 text-center bg-red-950/40 p-2 rounded-xl border border-red-800/50">
-                {getTranslation(lang, 'noDivisionsSelectedWarning')}
+            {activeClubsCount === 0 && (
+              <div className="mt-2 text-xs font-bold text-red-400 text-center bg-red-950/40 p-2.5 rounded-xl border border-red-800/50">
+                Nenhum clube atende aos filtros selecionados! Por favor, ative pelo menos uma opção.
               </div>
             )}
           </div>
@@ -259,9 +441,9 @@ export const NewSeriesView: React.FC<NewSeriesViewProps> = ({
           <button
             id="start-series-submit-btn"
             type="submit"
-            disabled={selectedDivisions.length === 0}
+            disabled={activeClubsCount === 0}
             className={`w-full mt-2 py-4 px-6 rounded-2xl font-black text-xl uppercase tracking-wider transition-all flex items-center justify-center gap-2 border border-white/40 ${
-              selectedDivisions.length > 0
+              activeClubsCount > 0
                 ? 'bg-gradient-to-r from-[#00FF85] via-[#02E374] to-[#00CC66] text-[#0a0b0e] shadow-xl shadow-[#00FF85]/30 hover:shadow-[#00FF85]/50 hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
                 : 'bg-gray-800 text-gray-500 cursor-not-allowed border-gray-700'
             }`}

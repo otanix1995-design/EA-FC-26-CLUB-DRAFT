@@ -71,7 +71,9 @@ export default function App() {
     p1Name: string,
     p2Name: string,
     format: SeriesFormat,
-    excludedDivisions?: string[]
+    excludedDivisions?: string[],
+    excludedLeagues?: string[],
+    excludedCountries?: string[]
   ) => {
     const winsToWin = format === 1 ? 1 : format === 3 ? 2 : format === 5 ? 3 : 4;
 
@@ -89,6 +91,8 @@ export default function App() {
       matches: [],
       drawnClubIds: [],
       excludedDivisions: excludedDivisions || settings.excludedDivisions || [],
+      excludedLeagues: excludedLeagues || settings.excludedLeagues || [],
+      excludedCountries: excludedCountries || settings.excludedCountries || [],
       status: 'drafting_p1',
       currentMatchIndex: 0,
       createdAt: new Date().toISOString(),
@@ -98,11 +102,15 @@ export default function App() {
     setView('draft');
   };
 
-  const handleUpdateExcludedDivisions = (newExcluded: string[]) => {
+  const handleUpdateSeriesFilters = (filters: {
+    excludedDivisions?: string[];
+    excludedLeagues?: string[];
+    excludedCountries?: string[];
+  }) => {
     if (!activeSeries) return;
     setActiveSeries({
       ...activeSeries,
-      excludedDivisions: newExcluded,
+      ...filters,
     });
   };
 
@@ -247,7 +255,7 @@ export default function App() {
             onConfirmDraftP1={handleConfirmDraftP1}
             onConfirmDraftP2={handleConfirmDraftP2}
             onStartMatch={handleStartMatch}
-            onUpdateExcludedDivisions={handleUpdateExcludedDivisions}
+            onUpdateSeriesFilters={handleUpdateSeriesFilters}
           />
         )}
 

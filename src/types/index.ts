@@ -38,6 +38,8 @@ export interface Series {
   matches: MatchResult[];
   drawnClubIds: string[];
   excludedDivisions?: string[];
+  excludedLeagues?: string[];
+  excludedCountries?: string[];
   winnerName?: string;
   winnerPlayer?: 1 | 2;
   status: 'drafting_p1' | 'drafting_p2' | 'vs_ready' | 'in_match' | 'completed';
@@ -55,6 +57,8 @@ export interface Settings {
   rouletteTime: 5 | 8 | 10; // seconds
   language: Language;
   excludedDivisions?: string[];
+  excludedLeagues?: string[];
+  excludedCountries?: string[];
 }
 
 export interface StatisticsData {

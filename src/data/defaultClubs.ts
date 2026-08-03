@@ -50,18 +50,6 @@ export const DEFAULT_CLUBS: Club[] = [
   { id: '38', nome: 'Olympique Lyonnais', pais: 'França', liga: 'Ligue 1 McDonald\'s', divisao: '1ª Divisão', badgeColor: '#12264C', rating: 78 },
   { id: '39', nome: 'Lille OSC', pais: 'França', liga: 'Ligue 1 McDonald\'s', divisao: '1ª Divisão', badgeColor: '#E2001A', rating: 79 },
 
-  // Brasileirão (Brasil)
-  { id: '40', nome: 'Flamengo', pais: 'Brasil', liga: 'Brasileirão Série A', divisao: 'Série A', badgeColor: '#C8102E', rating: 81 },
-  { id: '41', nome: 'Palmeiras', pais: 'Brasil', liga: 'Brasileirão Série A', divisao: 'Série A', badgeColor: '#006437', rating: 81 },
-  { id: '42', nome: 'Atlético Mineiro', pais: 'Brasil', liga: 'Brasileirão Série A', divisao: 'Série A', badgeColor: '#000000', rating: 79 },
-  { id: '43', nome: 'São Paulo FC', pais: 'Brasil', liga: 'Brasileirão Série A', divisao: 'Série A', badgeColor: '#C8102E', rating: 78 },
-  { id: '44', nome: 'Botafogo', pais: 'Brasil', liga: 'Brasileirão Série A', divisao: 'Série A', badgeColor: '#000000', rating: 80 },
-  { id: '45', nome: 'Fluminense', pais: 'Brasil', liga: 'Brasileirão Série A', divisao: 'Série A', badgeColor: '#8E1F2F', rating: 78 },
-  { id: '46', nome: 'Internacional', pais: 'Brasil', liga: 'Brasileirão Série A', divisao: 'Série A', badgeColor: '#E10019', rating: 78 },
-  { id: '47', nome: 'Grêmio', pais: 'Brasil', liga: 'Brasileirão Série A', divisao: 'Série A', badgeColor: '#0097D7', rating: 77 },
-  { id: '48', nome: 'Corinthians', pais: 'Brasil', liga: 'Brasileirão Série A', divisao: 'Série A', badgeColor: '#000000', rating: 77 },
-  { id: '49', nome: 'Cruzeiro', pais: 'Brasil', liga: 'Brasileirão Série A', divisao: 'Série A', badgeColor: '#003DA5', rating: 77 },
-
   // Saudi Pro League (Arábia Saudita)
   { id: '50', nome: 'Al Hilal', pais: 'Arábia Saudita', liga: 'ROSHN Saudi League', divisao: '1ª Divisão', badgeColor: '#00529F', rating: 82 },
   { id: '51', nome: 'Al Nassr', pais: 'Arábia Saudita', liga: 'ROSHN Saudi League', divisao: '1ª Divisão', badgeColor: '#FFF200', rating: 81 },
