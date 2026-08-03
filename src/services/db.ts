@@ -7,6 +7,68 @@ const CLUBS_KEY = 'eafc26_clubs_v1';
 const HISTORY_KEY = 'eafc26_series_history_v1';
 const SETTINGS_KEY = 'eafc26_settings_v1';
 
+let memoryClubsCache: Club[] | null = null;
+
+function saveClubsToIDB(key: string, value: any): void {
+  try {
+    if (!window.indexedDB) return;
+    const req = window.indexedDB.open('EAFC26_Draft_DB', 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('app_data')) {
+        db.createObjectStore('app_data');
+      }
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      try {
+        const tx = db.transaction('app_data', 'readwrite');
+        tx.objectStore('app_data').put(value, key);
+      } catch (e) {
+        console.warn('IDB put error:', e);
+      }
+    };
+  } catch (err) {
+    console.warn('IDB open error:', err);
+  }
+}
+
+function loadClubsFromIDB(key: string, callback: (val: any) => void): void {
+  try {
+    if (!window.indexedDB) return;
+    const req = window.indexedDB.open('EAFC26_Draft_DB', 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('app_data')) {
+        db.createObjectStore('app_data');
+      }
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      try {
+        const tx = db.transaction('app_data', 'readonly');
+        const getReq = tx.objectStore('app_data').get(key);
+        getReq.onsuccess = () => {
+          if (getReq.result) {
+            callback(getReq.result);
+          }
+        };
+      } catch (e) {
+        console.warn('IDB get error:', e);
+      }
+    };
+  } catch (err) {
+    console.warn('IDB load error:', err);
+  }
+}
+
+// Asynchronously hydrate memory cache from IDB
+loadClubsFromIDB(CLUBS_KEY, (idbClubs) => {
+  if (Array.isArray(idbClubs) && idbClubs.length > 0) {
+    memoryClubsCache = idbClubs;
+  }
+});
+
 export const defaultSettings: Settings = {
   darkMode: true,
   soundEnabled: true,
@@ -219,6 +281,9 @@ export function disambiguateLeagues(clubs: Club[]): { clubs: Club[]; mutated: bo
 class DatabaseService {
   // --- CLUBS ---
   public getClubs(): Club[] {
+    if (memoryClubsCache && memoryClubsCache.length > 0) {
+      return memoryClubsCache;
+    }
     try {
       const data = localStorage.getItem(CLUBS_KEY);
       if (!data) {
@@ -256,6 +321,8 @@ class DatabaseService {
 
       if (mutated) {
         this.saveClubs(filtered);
+      } else {
+        memoryClubsCache = filtered;
       }
 
       return filtered;
@@ -286,9 +353,17 @@ class DatabaseService {
       });
 
       const uniqueList = Array.from(uniqueMap.values());
-      localStorage.setItem(CLUBS_KEY, JSON.stringify(uniqueList));
+      memoryClubsCache = uniqueList;
+
+      try {
+        localStorage.setItem(CLUBS_KEY, JSON.stringify(uniqueList));
+      } catch (e) {
+        console.warn('LocalStorage saveClubs quota warning:', e);
+      }
+
+      saveClubsToIDB(CLUBS_KEY, uniqueList);
     } catch (err) {
-      console.error('Erro ao salvar clubes no localStorage:', err);
+      console.error('Erro ao salvar clubes:', err);
     }
   }
 

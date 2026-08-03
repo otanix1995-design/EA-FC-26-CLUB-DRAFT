@@ -195,23 +195,105 @@ PRIMARY_KNOWN_LEAGUES.forEach((primary) => {
 
 const CUSTOM_LEAGUE_LOGOS_KEY = 'eafc26_custom_league_logos_v1';
 
-export function getCustomLeagueLogosMap(): Record<string, string> {
+let memoryCustomLeagueLogosMap: Record<string, string> | null = null;
+
+// Lightweight IndexedDB helper
+function saveToIDB(key: string, value: any): void {
   try {
-    const data = localStorage.getItem(CUSTOM_LEAGUE_LOGOS_KEY);
-    if (!data) return {};
-    return JSON.parse(data);
-  } catch {
-    return {};
+    if (!window.indexedDB) return;
+    const req = window.indexedDB.open('EAFC26_Draft_DB', 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('app_data')) {
+        db.createObjectStore('app_data');
+      }
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      try {
+        const tx = db.transaction('app_data', 'readwrite');
+        tx.objectStore('app_data').put(value, key);
+      } catch (e) {
+        console.warn('IDB put error:', e);
+      }
+    };
+  } catch (err) {
+    console.warn('IDB open error:', err);
   }
 }
 
+function loadFromIDB(key: string, callback: (val: any) => void): void {
+  try {
+    if (!window.indexedDB) return;
+    const req = window.indexedDB.open('EAFC26_Draft_DB', 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('app_data')) {
+        db.createObjectStore('app_data');
+      }
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      try {
+        const tx = db.transaction('app_data', 'readonly');
+        const getReq = tx.objectStore('app_data').get(key);
+        getReq.onsuccess = () => {
+          if (getReq.result) {
+            callback(getReq.result);
+          }
+        };
+      } catch (e) {
+        console.warn('IDB get error:', e);
+      }
+    };
+  } catch (err) {
+    console.warn('IDB load error:', err);
+  }
+}
+
+// Immediately asynchronously load from IndexedDB into memory
+loadFromIDB(CUSTOM_LEAGUE_LOGOS_KEY, (idbMap) => {
+  if (idbMap && typeof idbMap === 'object') {
+    memoryCustomLeagueLogosMap = {
+      ...(memoryCustomLeagueLogosMap || {}),
+      ...idbMap,
+    };
+  }
+});
+
+export function getCustomLeagueLogosMap(): Record<string, string> {
+  if (memoryCustomLeagueLogosMap !== null) {
+    return memoryCustomLeagueLogosMap;
+  }
+
+  try {
+    const data = localStorage.getItem(CUSTOM_LEAGUE_LOGOS_KEY);
+    if (data) {
+      memoryCustomLeagueLogosMap = JSON.parse(data);
+      return memoryCustomLeagueLogosMap || {};
+    }
+  } catch {
+    // Ignore localStorage read errors
+  }
+
+  memoryCustomLeagueLogosMap = {};
+  return memoryCustomLeagueLogosMap;
+}
+
 export function saveCustomLeagueLogosMap(map: Record<string, string>): void {
+  memoryCustomLeagueLogosMap = { ...map };
+  
+  // 1. Try saving to localStorage
   try {
     localStorage.setItem(CUSTOM_LEAGUE_LOGOS_KEY, JSON.stringify(map));
   } catch (err) {
     console.error('Erro ao salvar logos customizados no localStorage:', err);
   }
+
+  // 2. Always save to IndexedDB as robust long-term backup
+  saveToIDB(CUSTOM_LEAGUE_LOGOS_KEY, map);
 }
+
 
 export function getRelatedLeagueNames(leagueName: string): string[] {
   if (!leagueName) return [];

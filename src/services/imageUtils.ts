@@ -2,7 +2,7 @@
  * Helper utility to resize and compress images (Files or data URLs) down to max dimensions
  * to fit safely inside localStorage without throwing QuotaExceededError.
  */
-export function resizeImage(source: File | string, maxDim = 200, quality = 0.85): Promise<string> {
+export function resizeImage(source: File | string, maxDim = 180, quality = 0.8): Promise<string> {
   return new Promise((resolve) => {
     if (!source) {
       return resolve('');
@@ -29,8 +29,8 @@ export function resizeImage(source: File | string, maxDim = 200, quality = 0.85)
     const processImageObj = (img: HTMLImageElement, fallbackUrl: string) => {
       try {
         const canvas = document.createElement('canvas');
-        let width = img.width || maxDim;
-        let height = img.height || maxDim;
+        let width = img.naturalWidth || img.width || maxDim;
+        let height = img.naturalHeight || img.height || maxDim;
 
         if (width > maxDim || height > maxDim) {
           if (width > height) {
@@ -46,9 +46,22 @@ export function resizeImage(source: File | string, maxDim = 200, quality = 0.85)
         canvas.height = Math.max(1, height);
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
-          const resizedDataUrl = canvas.toDataURL('image/png', quality);
-          resolve(resizedDataUrl);
+
+          // Try canvas PNG or WEBP/JPEG
+          let dataUrl = canvas.toDataURL('image/png');
+          // If PNG string is over 120KB, compress with webp/jpeg
+          if (dataUrl.length > 120000) {
+            const webp = canvas.toDataURL('image/webp', quality);
+            if (webp && webp.startsWith('data:image/webp')) {
+              dataUrl = webp;
+            } else {
+              dataUrl = canvas.toDataURL('image/jpeg', quality);
+            }
+          }
+          resolve(dataUrl);
         } else {
           resolve(fallbackUrl);
         }
@@ -58,25 +71,32 @@ export function resizeImage(source: File | string, maxDim = 200, quality = 0.85)
       }
     };
 
+    const loadAndProcess = (dataUrl: string) => {
+      const img = new Image();
+      // CRITICAL: DO NOT set img.crossOrigin for data: URIs as it causes onerror on mobile/Chrome webviews!
+      if (typeof dataUrl === 'string' && (dataUrl.startsWith('http://') || dataUrl.startsWith('https://'))) {
+        img.crossOrigin = 'anonymous';
+      }
+      img.onload = () => processImageObj(img, dataUrl);
+      img.onerror = (err) => {
+        console.warn('Image load error during resize:', err);
+        resolve(dataUrl);
+      };
+      img.src = dataUrl;
+    };
+
     if (source instanceof File) {
       const reader = new FileReader();
       reader.onload = (e) => {
         const dataUrl = (e.target?.result as string) || '';
         if (!dataUrl) return resolve('');
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => processImageObj(img, dataUrl);
-        img.onerror = () => resolve(dataUrl);
-        img.src = dataUrl;
+        loadAndProcess(dataUrl);
       };
       reader.onerror = () => resolve('');
       reader.readAsDataURL(source);
     } else {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => processImageObj(img, source);
-      img.onerror = () => resolve(source);
-      img.src = source;
+      loadAndProcess(source);
     }
   });
 }
+
