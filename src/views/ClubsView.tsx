@@ -420,7 +420,7 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {visibleClubs.map((club) => (
             <div
-              key={club.id}
+              key={`${club.id}_${refreshKey}`}
               className="bg-[#12151c] border border-gray-800/80 hover:border-[#00FF85]/40 rounded-2xl p-3.5 transition-all hover:shadow-lg hover:shadow-[#00FF85]/5 flex items-center justify-between group relative overflow-hidden"
             >
               <div className="flex items-center gap-3 min-w-0 pr-2">

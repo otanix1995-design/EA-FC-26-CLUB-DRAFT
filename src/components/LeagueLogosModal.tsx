@@ -163,7 +163,53 @@ export const LeagueLogosModal: React.FC<LeagueLogosModalProps> = ({
     setEditingLeague(null);
   };
 
-  const handleFileUpload = (leagueName: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const resizeImageToDataUrl = (file: File, maxDim = 300): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (file.type === 'image/svg+xml') {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result as string);
+        reader.onerror = () => reject(new Error('Erro ao ler arquivo SVG.'));
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/png'));
+          } else {
+            resolve(ev.target?.result as string);
+          }
+        };
+        img.onerror = () => resolve(ev.target?.result as string);
+        img.src = ev.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Erro ao ler arquivo de imagem.'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = async (leagueName: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -172,19 +218,12 @@ export const LeagueLogosModal: React.FC<LeagueLogosModalProps> = ({
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setErrorMsg('A imagem deve ter no máximo 2MB.');
-      return;
+    try {
+      const resizedDataUrl = await resizeImageToDataUrl(file, 300);
+      handleSaveLogo(leagueName, resizedDataUrl);
+    } catch (err) {
+      setErrorMsg('Erro ao processar imagem.');
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        handleSaveLogo(leagueName, result);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleJsonImport = (e: React.ChangeEvent<HTMLInputElement>) => {

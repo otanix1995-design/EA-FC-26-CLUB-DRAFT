@@ -206,16 +206,48 @@ export function getCustomLeagueLogosMap(): Record<string, string> {
 }
 
 export function saveCustomLeagueLogosMap(map: Record<string, string>): void {
-  localStorage.setItem(CUSTOM_LEAGUE_LOGOS_KEY, JSON.stringify(map));
+  try {
+    localStorage.setItem(CUSTOM_LEAGUE_LOGOS_KEY, JSON.stringify(map));
+  } catch (err) {
+    console.error('Erro ao salvar logos customizados no localStorage:', err);
+  }
+}
+
+export function getRelatedLeagueNames(leagueName: string): string[] {
+  if (!leagueName) return [];
+  const lower = leagueName.toLowerCase().trim();
+  const set = new Set<string>([leagueName.trim()]);
+
+  PRIMARY_KNOWN_LEAGUES.forEach((primary) => {
+    const pNameLower = primary.name.toLowerCase();
+    const aliasLowers = primary.aliases.map((a) => a.toLowerCase());
+
+    if (
+      pNameLower === lower ||
+      aliasLowers.includes(lower) ||
+      (lower.length > 3 && (pNameLower.includes(lower) || lower.includes(pNameLower)))
+    ) {
+      set.add(primary.name);
+      primary.aliases.forEach((a) => set.add(a));
+    }
+  });
+
+  return Array.from(set);
 }
 
 export function setCustomLeagueLogo(leagueName: string, logoUrl: string): void {
   if (!leagueName) return;
   const map = getCustomLeagueLogosMap();
+  const relatedNames = getRelatedLeagueNames(leagueName);
+
   if (logoUrl.trim()) {
-    map[leagueName.trim()] = logoUrl.trim();
+    relatedNames.forEach((name) => {
+      map[name] = logoUrl.trim();
+    });
   } else {
-    delete map[leagueName.trim()];
+    relatedNames.forEach((name) => {
+      delete map[name];
+    });
   }
   saveCustomLeagueLogosMap(map);
 }
@@ -225,19 +257,29 @@ export function getLeagueLogo(leagueName: string): string | undefined {
   const rawKey = leagueName.trim();
   const lowerKey = rawKey.toLowerCase();
 
-  // 1. Check user custom mappings first
+  // 1. Check user custom mappings first (exact case or lower case)
   const customMap = getCustomLeagueLogosMap();
   if (customMap[rawKey]) return customMap[rawKey];
   for (const [key, url] of Object.entries(customMap)) {
     if (key.toLowerCase() === lowerKey) return url;
   }
 
-  // 2. Check KNOWN_LEAGUE_LOGOS exact match
+  // 2. Check related alias names in customMap
+  const related = getRelatedLeagueNames(rawKey);
+  for (const rel of related) {
+    if (customMap[rel]) return customMap[rel];
+    const relLower = rel.toLowerCase();
+    for (const [key, url] of Object.entries(customMap)) {
+      if (key.toLowerCase() === relLower) return url;
+    }
+  }
+
+  // 3. Check KNOWN_LEAGUE_LOGOS exact match
   if (KNOWN_LEAGUE_LOGOS[lowerKey]) {
     return KNOWN_LEAGUE_LOGOS[lowerKey];
   }
 
-  // 3. Substring fuzzy match
+  // 4. Substring fuzzy match in KNOWN_LEAGUE_LOGOS
   for (const [name, url] of Object.entries(KNOWN_LEAGUE_LOGOS)) {
     if (lowerKey.includes(name) || name.includes(lowerKey)) {
       return url;
