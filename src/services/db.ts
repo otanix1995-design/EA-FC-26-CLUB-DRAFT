@@ -265,27 +265,31 @@ class DatabaseService {
   }
 
   public saveClubs(clubs: Club[]): void {
-    // Disambiguate leagues with same generic name in different countries
-    const { clubs: disambiguated } = disambiguateLeagues(clubs.map(sanitizeClub));
+    try {
+      // Disambiguate leagues with same generic name in different countries
+      const { clubs: disambiguated } = disambiguateLeagues(clubs.map(sanitizeClub));
 
-    // Remove duplicates based on lowercased club name & league
-    const uniqueMap = new Map<string, Club>();
-    disambiguated.forEach((c) => {
-      const key = `${c.nome.trim().toLowerCase()}_${c.liga.trim().toLowerCase()}`;
-      if (!uniqueMap.has(key)) {
-        uniqueMap.set(key, {
-          ...c,
-          id: c.id || `club_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          nome: c.nome.trim(),
-          pais: c.pais.trim(),
-          liga: c.liga.trim(),
-          divisao: c.divisao.trim(),
-        });
-      }
-    });
+      // Remove duplicates based on lowercased club name & league
+      const uniqueMap = new Map<string, Club>();
+      disambiguated.forEach((c) => {
+        const key = `${c.nome.trim().toLowerCase()}_${c.liga.trim().toLowerCase()}`;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, {
+            ...c,
+            id: c.id || `club_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            nome: c.nome.trim(),
+            pais: c.pais.trim(),
+            liga: c.liga.trim(),
+            divisao: c.divisao.trim(),
+          });
+        }
+      });
 
-    const uniqueList = Array.from(uniqueMap.values());
-    localStorage.setItem(CLUBS_KEY, JSON.stringify(uniqueList));
+      const uniqueList = Array.from(uniqueMap.values());
+      localStorage.setItem(CLUBS_KEY, JSON.stringify(uniqueList));
+    } catch (err) {
+      console.error('Erro ao salvar clubes no localStorage:', err);
+    }
   }
 
   public addClub(newClub: Omit<Club, 'id'> | Club): Club[] {
@@ -303,19 +307,19 @@ class DatabaseService {
 
     // Prepend to top of the list so newly added clubs appear first
     const updated = [created, ...clubs];
-    localStorage.setItem(CLUBS_KEY, JSON.stringify(updated));
+    this.saveClubs(updated);
     return updated;
   }
 
   public deleteClub(id: string): Club[] {
     const clubs = this.getClubs().filter((c) => c.id !== id);
-    localStorage.setItem(CLUBS_KEY, JSON.stringify(clubs));
+    this.saveClubs(clubs);
     return clubs;
   }
 
   public updateClub(updatedClub: Club): Club[] {
     const clubs = this.getClubs().map((c) => (c.id === updatedClub.id ? updatedClub : c));
-    localStorage.setItem(CLUBS_KEY, JSON.stringify(clubs));
+    this.saveClubs(clubs);
     return clubs;
   }
 

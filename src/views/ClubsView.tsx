@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Club, Settings } from '../types';
 import { getTranslation } from '../services/i18n';
 import { getLeagueLogo } from '../services/leagueLogos';
+import { resizeImage } from '../services/imageUtils';
 import { LeagueLogosModal } from '../components/LeagueLogosModal';
 import { CountryFlag } from '../components/CountryFlag';
 import {
@@ -157,7 +158,7 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
     setIsAddModalOpen(true);
   };
 
-  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -166,57 +167,65 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setFormError('A imagem deve ter no máximo 2MB.');
-      return;
+    try {
+      const resized = await resizeImage(file, 200);
+      setFormLogoUrl(resized);
+      setFormError('');
+    } catch (err) {
+      setFormError('Erro ao processar imagem.');
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        setFormLogoUrl(result);
-        setFormError('');
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
+
     if (!formNome.trim()) {
       setFormError('Informe o nome do clube.');
       return;
     }
 
-    if (editingClub) {
-      if (onUpdateClub) {
-        onUpdateClub({
-          ...editingClub,
+    try {
+      let finalLogoUrl = formLogoUrl ? formLogoUrl.trim() : undefined;
+      if (finalLogoUrl && finalLogoUrl.startsWith('data:image')) {
+        finalLogoUrl = await resizeImage(finalLogoUrl, 200);
+      }
+
+      if (editingClub) {
+        if (onUpdateClub) {
+          onUpdateClub({
+            ...editingClub,
+            nome: formNome.trim(),
+            pais: formPais.trim() || 'Internacional',
+            liga: formLiga.trim() || 'Liga Geral',
+            divisao: formDivisao.trim() || '1ª Divisão',
+            badgeColor: formColor,
+            rating: Number(formRating) || 80,
+            logoUrl: finalLogoUrl || undefined,
+          });
+        }
+      } else {
+        onAddClub({
           nome: formNome.trim(),
           pais: formPais.trim() || 'Internacional',
           liga: formLiga.trim() || 'Liga Geral',
           divisao: formDivisao.trim() || '1ª Divisão',
           badgeColor: formColor,
           rating: Number(formRating) || 80,
-          logoUrl: formLogoUrl || undefined,
+          logoUrl: finalLogoUrl || undefined,
         });
       }
-    } else {
-      onAddClub({
-        nome: formNome.trim(),
-        pais: formPais.trim() || 'Internacional',
-        liga: formLiga.trim() || 'Liga Geral',
-        divisao: formDivisao.trim() || '1ª Divisão',
-        badgeColor: formColor,
-        rating: Number(formRating) || 80,
-        logoUrl: formLogoUrl || undefined,
-      });
-    }
 
-    // Reset Form & Close Modal
-    setIsAddModalOpen(false);
-    setEditingClub(null);
+      // Trigger re-render update
+      setRefreshKey((prev) => prev + 1);
+
+      // Reset Form & Close Modal
+      setIsAddModalOpen(false);
+      setEditingClub(null);
+    } catch (err) {
+      console.error('Erro ao salvar clube:', err);
+      setFormError('Ocorreu um erro ao salvar o clube. Tente usar uma URL de imagem externa.');
+    }
   };
 
   const handleDeleteConfirm = () => {

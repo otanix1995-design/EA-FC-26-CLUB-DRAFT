@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Club, Settings } from '../types';
 import { getTranslation } from '../services/i18n';
 import { CountryFlag } from './CountryFlag';
+import { resizeImage } from '../services/imageUtils';
 import {
   getLeagueLogo,
   setCustomLeagueLogo,
@@ -155,58 +156,21 @@ export const LeagueLogosModal: React.FC<LeagueLogosModalProps> = ({
     setErrorMsg('');
   };
 
-  const handleSaveLogo = (leagueName: string, url: string) => {
-    setCustomLeagueLogo(leagueName, url);
-    setSuccessMsg(`Logo da liga "${leagueName}" salva com sucesso!`);
-    setTimeout(() => setSuccessMsg(''), 3000);
-    onUpdate();
-    setEditingLeague(null);
-  };
-
-  const resizeImageToDataUrl = (file: File, maxDim = 300): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (file.type === 'image/svg+xml') {
-        const reader = new FileReader();
-        reader.onload = (ev) => resolve(ev.target?.result as string);
-        reader.onerror = () => reject(new Error('Erro ao ler arquivo SVG.'));
-        reader.readAsDataURL(file);
-        return;
+  const handleSaveLogo = async (leagueName: string, url: string) => {
+    try {
+      let finalUrl = url.trim();
+      if (finalUrl && finalUrl.startsWith('data:image')) {
+        finalUrl = await resizeImage(finalUrl, 200);
       }
-
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/png'));
-          } else {
-            resolve(ev.target?.result as string);
-          }
-        };
-        img.onerror = () => resolve(ev.target?.result as string);
-        img.src = ev.target?.result as string;
-      };
-      reader.onerror = () => reject(new Error('Erro ao ler arquivo de imagem.'));
-      reader.readAsDataURL(file);
-    });
+      setCustomLeagueLogo(leagueName, finalUrl);
+      setSuccessMsg(`Logo da liga "${leagueName}" salva com sucesso!`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+      onUpdate();
+      setEditingLeague(null);
+    } catch (err) {
+      console.error('Erro ao salvar logo da liga:', err);
+      setErrorMsg('Erro ao salvar logo da liga. Tente usar uma URL externa.');
+    }
   };
 
   const handleFileUpload = async (leagueName: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -219,8 +183,8 @@ export const LeagueLogosModal: React.FC<LeagueLogosModalProps> = ({
     }
 
     try {
-      const resizedDataUrl = await resizeImageToDataUrl(file, 300);
-      handleSaveLogo(leagueName, resizedDataUrl);
+      const resizedDataUrl = await resizeImage(file, 200);
+      await handleSaveLogo(leagueName, resizedDataUrl);
     } catch (err) {
       setErrorMsg('Erro ao processar imagem.');
     }
