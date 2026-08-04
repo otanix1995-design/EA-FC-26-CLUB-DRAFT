@@ -218,6 +218,54 @@ export function sanitizeClub(c: Club): Club {
   };
 }
 
+export function findClubMatchIndex(clubs: Club[], targetName: string): number {
+  if (!targetName || !clubs || clubs.length === 0) return -1;
+
+  const rawTarget = targetName.trim();
+  const cleanTarget = removeAccents(rawTarget.toLowerCase()).replace(/[^a-z0-9]/g, '');
+  if (!cleanTarget) return -1;
+
+  // Pass 1: Exact Clean String Match (e.g. "realmadrid" === "realmadrid")
+  let idx = clubs.findIndex((c) => {
+    const cleanC = removeAccents((c.nome || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, '');
+    return cleanC === cleanTarget;
+  });
+  if (idx !== -1) return idx;
+
+  // Pass 2: Normalized match stripping common football noise (e.g. "1. FC Kaiserslautern" vs "Kaiserslautern")
+  const stripNoise = (str: string) => {
+    let s = removeAccents((str || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, ' ');
+    s = s.replace(/\b\d+\b/g, ' ');
+    s = s.replace(/\b(fc|cf|sc|sv|vfb|vfl|ac|as|ca|cd|ud|sd|spvgg|tsv|club|clube|de)\b/g, ' ');
+    return s.split(/\s+/).filter(Boolean).join('');
+  };
+
+  const normTarget = stripNoise(rawTarget);
+  if (normTarget.length >= 3) {
+    idx = clubs.findIndex((c) => {
+      const normC = stripNoise(c.nome);
+      return normC === normTarget;
+    });
+    if (idx !== -1) return idx;
+  }
+
+  // Pass 3: Substring containment match for distinct names (length >= 5)
+  if (cleanTarget.length >= 5) {
+    idx = clubs.findIndex((c) => {
+      const cleanC = removeAccents((c.nome || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, '');
+      if (cleanC.length >= 5) {
+        if (cleanC.includes(cleanTarget) || cleanTarget.includes(cleanC)) {
+          return true;
+        }
+      }
+      return false;
+    });
+    if (idx !== -1) return idx;
+  }
+
+  return -1;
+}
+
 export function disambiguateLeagues(clubs: Club[]): { clubs: Club[]; mutated: boolean } {
   const leagueCountriesMap = new Map<string, Set<string>>();
 
@@ -643,24 +691,21 @@ class DatabaseService {
           } else {
             // MERGE MODE: Preserves user's custom edits (leagues, divisions, countries, logos) and updates GER rating!
             const currentClubs = this.getClubs().map(sanitizeClub);
-
-            const cleanName = (s: string) =>
-              removeAccents((s || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, '');
-
             const mergedList: Club[] = [...currentClubs];
 
             importedClubs.forEach((imp) => {
-              const key = cleanName(imp.nome);
-              const existingIndex = mergedList.findIndex((c) => cleanName(c.nome) === key);
+              const existingIndex = findClubMatchIndex(mergedList, imp.nome);
 
               if (existingIndex !== -1) {
                 // Update GER rating while preserving user custom edits (liga, divisao, pais, logoUrl)
                 const existing = mergedList[existingIndex];
+                if (existing.rating !== imp.rating) {
+                  updatedRatingsCount++;
+                }
                 mergedList[existingIndex] = {
                   ...existing,
                   rating: imp.rating, // UPDATE GER
                 };
-                updatedRatingsCount++;
               } else {
                 // Add new club from spreadsheet
                 const newClub = sanitizeClub(imp);
@@ -701,25 +746,21 @@ class DatabaseService {
 
   public syncDefaultRatings(): { updatedCount: number; totalClubs: number } {
     const currentClubs = this.getClubs();
-    const cleanName = (s: string) =>
-      removeAccents((s || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, '');
-
-    const defaultMap = new Map<string, number>();
-    DEFAULT_CLUBS.forEach((dc) => {
-      if (dc.rating) defaultMap.set(cleanName(dc.nome), dc.rating);
-    });
-
     let updatedCount = 0;
-    const updatedClubs = currentClubs.map((club) => {
-      const key = cleanName(club.nome);
-      if (defaultMap.has(key)) {
-        const newRating = defaultMap.get(key)!;
-        if (club.rating !== newRating) {
+    const updatedClubs = [...currentClubs];
+
+    DEFAULT_CLUBS.forEach((dc) => {
+      if (!dc.rating) return;
+      const matchIdx = findClubMatchIndex(updatedClubs, dc.nome);
+      if (matchIdx !== -1) {
+        if (updatedClubs[matchIdx].rating !== dc.rating) {
           updatedCount++;
-          return { ...club, rating: newRating };
+          updatedClubs[matchIdx] = {
+            ...updatedClubs[matchIdx],
+            rating: dc.rating,
+          };
         }
       }
-      return club;
     });
 
     if (updatedCount > 0) {
