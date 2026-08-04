@@ -1,11 +1,11 @@
 export interface GERTierConfig {
-  tierKey: 'elite' | 'gold' | 'silver' | 'bronze';
+  tierKey: 'icon' | 'elite' | 'gold' | 'silver' | 'bronze';
   tierLabel: string;
   badge: string;
   ratingLabel: string;
-  primaryColor: string;    // Hex format e.g. #A855F7
-  secondaryColor: string;  // Hex format e.g. #EC4899
-  accentColor: string;     // Hex format e.g. #00F0FF
+  primaryColor: string;    // Hex format e.g. #38BDF8
+  secondaryColor: string;  // Hex format e.g. #FFD700
+  accentColor: string;     // Hex format e.g. #FFFFFF
   borderClass: string;
   borderHex: string;
   glowClass: string;
@@ -16,13 +16,33 @@ export interface GERTierConfig {
 }
 
 export function getGERTierConfig(rating: number = 80): GERTierConfig {
-  // 1. ÉLITE / ROXA (EA FC SPECIAL / HERO) - GER 85+
+  // 1. ICON / LENDÁRIO (EA FC ICON CARD) - GER 91+
+  if (rating >= 91) {
+    return {
+      tierKey: 'icon',
+      tierLabel: 'Icon / Lendário',
+      badge: '👑 ICON (91+)',
+      ratingLabel: 'CARTA ICON 91+',
+      primaryColor: '#00F0FF',
+      secondaryColor: '#FFD700',
+      accentColor: '#FFFFFF',
+      borderClass: 'border-cyan-300',
+      borderHex: '#00F0FF',
+      glowClass: 'shadow-[0_0_70px_rgba(0,240,255,0.9)]',
+      glowColorRgba: 'rgba(0,240,255,0.9)',
+      bgGradientClass: 'from-cyan-500/30 via-amber-400/20 to-black',
+      textColorClass: 'text-cyan-200',
+      badgeClass: 'bg-gradient-to-r from-cyan-400/40 via-amber-300/40 to-cyan-400/40 border-2 border-cyan-200 text-white font-black shadow-xl shadow-cyan-400/50 animate-pulse',
+    };
+  }
+
+  // 2. ÉLITE / ROXA (EA FC SPECIAL / HERO) - GER 85 a 90
   if (rating >= 85) {
     return {
       tierKey: 'elite',
       tierLabel: 'Élite Roxa',
-      badge: '💜 ÉLITE (85+)',
-      ratingLabel: 'CARTA ÉLITE 85+',
+      badge: '💜 ÉLITE (85-90)',
+      ratingLabel: 'CARTA ÉLITE 85-90',
       primaryColor: '#A855F7',
       secondaryColor: '#EC4899',
       accentColor: '#38BDF8',
