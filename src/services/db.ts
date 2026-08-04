@@ -405,12 +405,18 @@ class DatabaseService {
   }
 
   // --- EXCEL IMPORT ---
-  public async importClubsFromExcel(file: File): Promise<{
+  public async importClubsFromExcel(
+    file: File,
+    mode: 'merge' | 'replace' = 'merge'
+  ): Promise<{
     clubs: Club[];
     totalClubs: number;
     totalCountries: number;
     totalLeagues: number;
     totalDivisions: number;
+    updatedRatingsCount: number;
+    newClubsAddedCount: number;
+    modeUsed: 'merge' | 'replace';
   }> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -624,11 +630,49 @@ class DatabaseService {
           }
 
           if (importedClubs.length === 0) {
-            throw new Error('Nenhum clube válido encontrado. Certifique-se de que a planilha possui as colunas: Clube | País | Liga | Divisão');
+            throw new Error('Nenhum clube válido encontrado. Certifique-se de que a planilha possui as colunas: Clube | País | Liga | Divisão | GER');
           }
 
-          // Replace old clubs in Storage automatically
-          this.saveClubs(importedClubs);
+          let finalClubs: Club[] = [];
+          let updatedRatingsCount = 0;
+          let newClubsAddedCount = 0;
+
+          if (mode === 'replace') {
+            finalClubs = importedClubs.map(sanitizeClub);
+            newClubsAddedCount = finalClubs.length;
+          } else {
+            // MERGE MODE: Preserves user's custom edits (leagues, divisions, countries, logos) and updates GER rating!
+            const currentClubs = this.getClubs().map(sanitizeClub);
+
+            const cleanName = (s: string) =>
+              removeAccents((s || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, '');
+
+            const mergedList: Club[] = [...currentClubs];
+
+            importedClubs.forEach((imp) => {
+              const key = cleanName(imp.nome);
+              const existingIndex = mergedList.findIndex((c) => cleanName(c.nome) === key);
+
+              if (existingIndex !== -1) {
+                // Update GER rating while preserving user custom edits (liga, divisao, pais, logoUrl)
+                const existing = mergedList[existingIndex];
+                mergedList[existingIndex] = {
+                  ...existing,
+                  rating: imp.rating, // UPDATE GER
+                };
+                updatedRatingsCount++;
+              } else {
+                // Add new club from spreadsheet
+                const newClub = sanitizeClub(imp);
+                mergedList.push(newClub);
+                newClubsAddedCount++;
+              }
+            });
+
+            finalClubs = mergedList;
+          }
+
+          this.saveClubs(finalClubs);
 
           const savedList = this.getClubs();
           const countriesSet = new Set(savedList.map((c) => c.pais));
@@ -641,6 +685,9 @@ class DatabaseService {
             totalCountries: countriesSet.size,
             totalLeagues: leaguesSet.size,
             totalDivisions: divisionsSet.size,
+            updatedRatingsCount,
+            newClubsAddedCount,
+            modeUsed: mode,
           });
         } catch (err) {
           reject(err instanceof Error ? err : new Error('Erro ao processar planilha Excel.'));
@@ -650,6 +697,36 @@ class DatabaseService {
       reader.onerror = () => reject(new Error('Erro de leitura do arquivo.'));
       reader.readAsArrayBuffer(file);
     });
+  }
+
+  public syncDefaultRatings(): { updatedCount: number; totalClubs: number } {
+    const currentClubs = this.getClubs();
+    const cleanName = (s: string) =>
+      removeAccents((s || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, '');
+
+    const defaultMap = new Map<string, number>();
+    DEFAULT_CLUBS.forEach((dc) => {
+      if (dc.rating) defaultMap.set(cleanName(dc.nome), dc.rating);
+    });
+
+    let updatedCount = 0;
+    const updatedClubs = currentClubs.map((club) => {
+      const key = cleanName(club.nome);
+      if (defaultMap.has(key)) {
+        const newRating = defaultMap.get(key)!;
+        if (club.rating !== newRating) {
+          updatedCount++;
+          return { ...club, rating: newRating };
+        }
+      }
+      return club;
+    });
+
+    if (updatedCount > 0) {
+      this.saveClubs(updatedClubs);
+    }
+
+    return { updatedCount, totalClubs: updatedClubs.length };
   }
 
   public downloadTemplateExcel(): void {

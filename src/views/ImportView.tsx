@@ -12,11 +12,15 @@ interface ImportViewProps {
 export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated }) => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
   const [importStats, setImportStats] = useState<{
     totalClubs: number;
     totalCountries: number;
     totalLeagues: number;
     totalDivisions: number;
+    updatedRatingsCount?: number;
+    newClubsAddedCount?: number;
+    modeUsed?: 'merge' | 'replace';
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,12 +35,15 @@ export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated
     setImportStats(null);
 
     try {
-      const result = await db.importClubsFromExcel(file);
+      const result = await db.importClubsFromExcel(file, importMode);
       setImportStats({
         totalClubs: result.totalClubs,
         totalCountries: result.totalCountries,
         totalLeagues: result.totalLeagues,
         totalDivisions: result.totalDivisions,
+        updatedRatingsCount: result.updatedRatingsCount,
+        newClubsAddedCount: result.newClubsAddedCount,
+        modeUsed: result.modeUsed,
       });
       onClubsUpdated();
     } catch (err) {
@@ -49,16 +56,28 @@ export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated
     }
   };
 
+  const handleSyncDefaultRatings = () => {
+    try {
+      const res = db.syncDefaultRatings();
+      onClubsUpdated();
+      alert(`Sincronização concluída! ${res.updatedCount} times tiveram suas notas GER atualizadas sem alterar ligas ou escudos.`);
+    } catch (err) {
+      alert('Erro ao sincronizar notas GER.');
+    }
+  };
+
   const handleDownloadTemplate = () => {
     db.downloadTemplateExcel();
   };
 
   const handleRestoreDefaults = () => {
-    db.restoreDefaultClubs();
-    setImportStats(null);
-    setErrorMsg(null);
-    onClubsUpdated();
-    alert('Clubes padrão do EA FC 26 restaurados com sucesso!');
+    if (confirm('Tem certeza que deseja restaurar a base original de 684 times do EA FC 26? Isso irá redefinir alterações personalizadas.')) {
+      db.restoreDefaultClubs();
+      setImportStats(null);
+      setErrorMsg(null);
+      onClubsUpdated();
+      alert('Clubes padrão do EA FC 26 restaurados com sucesso!');
+    }
   };
 
   return (
@@ -74,6 +93,57 @@ export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated
               {getTranslation(lang, 'importClubs')}
             </h2>
             <p className="text-xs text-gray-400">Importe sua planilha .xlsx ou .xls para atualizar o banco de dados</p>
+          </div>
+        </div>
+
+        {/* Import Mode Selector Cards */}
+        <div className="mb-6 space-y-2">
+          <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
+            Modo de Importação da Planilha:
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Merge Option (Recommended) */}
+            <div
+              onClick={() => setImportMode('merge')}
+              className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                importMode === 'merge'
+                  ? 'bg-[#00FF85]/10 border-[#00FF85] shadow-lg shadow-[#00FF85]/10'
+                  : 'bg-[#0a0b0e] border-gray-800 hover:border-gray-700'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-black text-white flex items-center gap-1.5">
+                  <RefreshCw className="w-3.5 h-3.5 text-[#00FF85]" />
+                  Mesclar e Atualizar GERs
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-[#00FF85]/20 text-[#00FF85] text-[10px] font-mono font-bold uppercase">
+                  Recomendado
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                Preserva suas ligas, divisões e escudos customizados intactos. Atualiza as notas GER dos times e adiciona novos clubes.
+              </p>
+            </div>
+
+            {/* Replace Option */}
+            <div
+              onClick={() => setImportMode('replace')}
+              className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                importMode === 'replace'
+                  ? 'bg-amber-500/10 border-amber-500 shadow-lg shadow-amber-500/10'
+                  : 'bg-[#0a0b0e] border-gray-800 hover:border-gray-700'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-black text-white flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                  Substituir Todos
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                Substitui completamente o banco de dados atual pelos dados contidos exclusivamente na planilha selecionada.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -111,7 +181,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated
                   <td className="py-1.5 px-3">LALIGA EA SPORTS</td>
                   <td className="py-1.5 px-3">1ª Divisão</td>
                   <td className="py-1.5 px-3">Espanha</td>
-                  <td className="py-1.5 px-3 text-amber-300 font-bold">83</td>
+                  <td className="py-1.5 px-3 text-amber-300 font-bold">86</td>
                 </tr>
                 <tr>
                   <td className="py-1.5 px-3 text-white font-semibold">Flamengo</td>
@@ -149,7 +219,9 @@ export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated
             ) : (
               <>
                 <Upload className="w-6 h-6" />
-                <span>{getTranslation(lang, 'selectExcelFile')} (.xlsx / .xls)</span>
+                <span>
+                  {importMode === 'merge' ? 'Mesclar Planilha (.xlsx / .xls)' : 'Substituir por Planilha (.xlsx / .xls)'}
+                </span>
               </>
             )}
           </button>
@@ -166,9 +238,16 @@ export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated
         {/* Import Success Metrics Display */}
         {importStats && (
           <div className="p-6 bg-[#0a0b0e] border-2 border-[#00FF85] rounded-3xl mb-6 shadow-xl shadow-[#00FF85]/10 animate-fadeIn">
-            <div className="flex items-center gap-2 text-[#00FF85] font-black text-lg mb-4">
-              <CheckCircle2 className="w-6 h-6" />
-              <span>{getTranslation(lang, 'importSuccess')}</span>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-[#00FF85] font-black text-lg">
+                <CheckCircle2 className="w-6 h-6" />
+                <span>{getTranslation(lang, 'importSuccess')}</span>
+              </div>
+              {importStats.updatedRatingsCount !== undefined && importStats.updatedRatingsCount > 0 && (
+                <span className="px-2.5 py-1 rounded-full bg-[#00FF85]/20 text-[#00FF85] text-xs font-mono font-bold">
+                  {importStats.updatedRatingsCount} GERs Atualizados!
+                </span>
+              )}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
@@ -195,25 +274,37 @@ export const ImportView: React.FC<ImportViewProps> = ({ settings, onClubsUpdated
           </div>
         )}
 
-        {/* Secondary Template & Reset Actions */}
+        {/* Quick GER Sync Button & Secondary Template Actions */}
         <div className="pt-4 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-3">
           <button
-            id="download-template-btn"
-            onClick={handleDownloadTemplate}
-            className="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-gray-700"
+            type="button"
+            onClick={handleSyncDefaultRatings}
+            className="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-amber-500/40"
+            title="Atualiza as notas GER dos times existentes para a base oficial do EA FC 26 sem alterar suas ligas e escudos"
           >
-            <Download className="w-4 h-4 text-amber-400" />
-            <span>{getTranslation(lang, 'downloadTemplate')}</span>
+            <RefreshCw className="w-4 h-4 text-amber-400" />
+            <span>Sincronizar GERs Oficiais</span>
           </button>
 
-          <button
-            id="restore-defaults-btn"
-            onClick={handleRestoreDefaults}
-            className="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-gray-800/80 hover:bg-gray-700 text-gray-400 hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-gray-700"
-          >
-            <RefreshCw className="w-4 h-4 text-cyan-400" />
-            <span>{getTranslation(lang, 'restoreDefaults')}</span>
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              id="download-template-btn"
+              onClick={handleDownloadTemplate}
+              className="flex-1 sm:flex-none py-2.5 px-4 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-gray-700"
+            >
+              <Download className="w-4 h-4 text-amber-400" />
+              <span>{getTranslation(lang, 'downloadTemplate')}</span>
+            </button>
+
+            <button
+              id="restore-defaults-btn"
+              onClick={handleRestoreDefaults}
+              className="flex-1 sm:flex-none py-2.5 px-4 rounded-xl bg-gray-800/80 hover:bg-gray-700 text-gray-400 hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-gray-700"
+            >
+              <RefreshCw className="w-4 h-4 text-cyan-400" />
+              <span>{getTranslation(lang, 'restoreDefaults')}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
