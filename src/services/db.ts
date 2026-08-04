@@ -213,6 +213,7 @@ export function sanitizeClub(c: Club): Club {
     pais,
     liga,
     divisao,
+    rating: typeof c.rating === 'number' && !isNaN(c.rating) && c.rating >= 10 && c.rating <= 99 ? c.rating : (c.rating ? parseInt(String(c.rating).replace(/[^\d]/g, ''), 10) || 80 : 80),
     logoUrl: c.logoUrl || getKnownClubLogo(nome),
   };
 }
@@ -485,7 +486,23 @@ class DatabaseService {
                 foundCountry = cIdx;
               } else if (
                 foundRating === -1 &&
-                (cellStr === 'ger' || cellStr === 'geral' || cellStr === 'ovr' || cellStr === 'overall' || cellStr === 'rating' || cellStr === 'nota' || cellStr === 'forca' || cellStr === 'over' || cellStr === 'power')
+                (
+                  cellStr === 'ger' ||
+                  cellStr === 'geral' ||
+                  cellStr === 'ovr' ||
+                  cellStr === 'overall' ||
+                  cellStr === 'rating' ||
+                  cellStr === 'nota' ||
+                  cellStr === 'forca' ||
+                  cellStr === 'over' ||
+                  cellStr === 'power' ||
+                  cellStr.startsWith('ger') ||
+                  cellStr.includes('ger') ||
+                  cellStr.includes('ovr') ||
+                  cellStr.includes('rating') ||
+                  cellStr.includes('overall') ||
+                  cellStr.includes('forca')
+                )
               ) {
                 foundRating = cIdx;
               }
@@ -570,8 +587,28 @@ class DatabaseService {
               continue;
             }
 
-            let parsedRating = parseInt(gerRaw, 10);
-            if (isNaN(parsedRating) || parsedRating < 10 || parsedRating > 99) {
+            let parsedRating = parseInt(String(gerRaw).replace(/[^\d]/g, ''), 10);
+
+            // If ratingCol didn't produce a valid rating (between 40 and 99), fallback to searching all cells in the row
+            if (isNaN(parsedRating) || parsedRating < 40 || parsedRating > 99) {
+              for (let colIdx = row.length - 1; colIdx >= 0; colIdx--) {
+                if (colIdx === nameCol || colIdx === leagueCol || colIdx === countryCol || colIdx === divisionCol) {
+                  continue;
+                }
+                const cellVal = row[colIdx];
+                if (typeof cellVal === 'number' && cellVal >= 40 && cellVal <= 99) {
+                  parsedRating = Math.round(cellVal);
+                  break;
+                }
+                const num = parseInt(String(cellVal || '').replace(/[^\d]/g, ''), 10);
+                if (!isNaN(num) && num >= 40 && num <= 99) {
+                  parsedRating = num;
+                  break;
+                }
+              }
+            }
+
+            if (isNaN(parsedRating) || parsedRating < 40 || parsedRating > 99) {
               parsedRating = 80;
             }
 
@@ -617,11 +654,11 @@ class DatabaseService {
 
   public downloadTemplateExcel(): void {
     const sampleData = [
-      { Clube: '1. FC Kaiserslautern', Liga: '2. Bundesliga', Divisão: '2ª Divisão', País: 'Alemanha' },
-      { Clube: 'Real Madrid', Liga: 'LALIGA EA SPORTS', Divisão: '1ª Divisão', País: 'Espanha' },
-      { Clube: 'Liverpool', Liga: 'Premier League', Divisão: '1ª Divisão', País: 'Inglaterra' },
-      { Clube: 'Flamengo', Liga: 'Brasileirão Série A', Divisão: 'Série A', País: 'Brasil' },
-      { Clube: 'Bayern München', Liga: 'Bundesliga', Divisão: '1ª Divisão', País: 'Alemanha' },
+      { Clube: '1. FC Kaiserslautern', Liga: '2. Bundesliga', Divisão: '2ª Divisão', País: 'Alemanha', GER: 69 },
+      { Clube: 'Real Madrid', Liga: 'LALIGA EA SPORTS', Divisão: '1ª Divisão', País: 'Espanha', GER: 86 },
+      { Clube: 'Liverpool', Liga: 'Premier League', Divisão: '1ª Divisão', País: 'Inglaterra', GER: 85 },
+      { Clube: 'Flamengo', Liga: 'Brasileirão Série A', Divisão: 'Série A', País: 'Brasil', GER: 79 },
+      { Clube: 'Bayern München', Liga: 'Bundesliga', Divisão: '1ª Divisão', País: 'Alemanha', GER: 86 },
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(sampleData);

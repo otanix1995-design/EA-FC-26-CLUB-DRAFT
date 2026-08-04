@@ -451,9 +451,14 @@ export const ClubsView: React.FC<ClubsViewProps> = ({
                 </div>
 
                 <div className="min-w-0">
-                  <h4 className="font-bold text-sm text-white truncate group-hover:text-[#00FF85] transition-colors">
-                    {club.nome}
-                  </h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-sm text-white truncate group-hover:text-[#00FF85] transition-colors">
+                      {club.nome}
+                    </h4>
+                    <span className="px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono font-black text-[10px] shrink-0 shadow-xs">
+                      GER {club.rating || 80}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-gray-400 truncate mt-0.5">
                     {getLeagueLogo(club.liga) ? (
                       <span className="w-4 h-4 rounded-xs bg-slate-100 p-0.5 inline-flex items-center justify-center shrink-0">
