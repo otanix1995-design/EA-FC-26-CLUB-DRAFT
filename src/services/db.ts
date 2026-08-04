@@ -232,11 +232,11 @@ export function findClubMatchIndex(clubs: Club[], targetName: string): number {
   });
   if (idx !== -1) return idx;
 
-  // Pass 2: Normalized match stripping common football noise (e.g. "1. FC Kaiserslautern" vs "Kaiserslautern")
+  // Pass 2: Normalized match stripping common football noise & prefixes (e.g. "1. FC Kaiserslautern" vs "Kaiserslautern", "DSC Arminia Bielefeld" vs "Arminia Bielefeld")
   const stripNoise = (str: string) => {
     let s = removeAccents((str || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, ' ');
     s = s.replace(/\b\d+\b/g, ' ');
-    s = s.replace(/\b(fc|cf|sc|sv|vfb|vfl|ac|as|ca|cd|ud|sd|spvgg|tsv|club|clube|de)\b/g, ' ');
+    s = s.replace(/\b(fc|cf|sc|sv|vfb|vfl|dsc|fcn|bvb|ac|as|ca|cd|ud|sd|spvgg|tsv|ksv|fsv|ssv|sg|sgv|rb|club|clube|de|real|atletico|sporting|inter|borussia|eintracht|fortuna|1fc|1)\b/g, ' ');
     return s.split(/\s+/).filter(Boolean).join('');
   };
 
@@ -249,11 +249,11 @@ export function findClubMatchIndex(clubs: Club[], targetName: string): number {
     if (idx !== -1) return idx;
   }
 
-  // Pass 3: Substring containment match for distinct names (length >= 5)
-  if (cleanTarget.length >= 5) {
+  // Pass 3: Substring containment match for distinct names (length >= 4)
+  if (cleanTarget.length >= 4) {
     idx = clubs.findIndex((c) => {
       const cleanC = removeAccents((c.nome || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, '');
-      if (cleanC.length >= 5) {
+      if (cleanC.length >= 4) {
         if (cleanC.includes(cleanTarget) || cleanTarget.includes(cleanC)) {
           return true;
         }
@@ -642,9 +642,10 @@ class DatabaseService {
             }
 
             let parsedRating = parseInt(String(gerRaw).replace(/[^\d]/g, ''), 10);
+            let hasExplicitRating = !isNaN(parsedRating) && parsedRating >= 40 && parsedRating <= 99;
 
             // If ratingCol didn't produce a valid rating (between 40 and 99), fallback to searching all cells in the row
-            if (isNaN(parsedRating) || parsedRating < 40 || parsedRating > 99) {
+            if (!hasExplicitRating) {
               for (let colIdx = row.length - 1; colIdx >= 0; colIdx--) {
                 if (colIdx === nameCol || colIdx === leagueCol || colIdx === countryCol || colIdx === divisionCol) {
                   continue;
@@ -652,17 +653,19 @@ class DatabaseService {
                 const cellVal = row[colIdx];
                 if (typeof cellVal === 'number' && cellVal >= 40 && cellVal <= 99) {
                   parsedRating = Math.round(cellVal);
+                  hasExplicitRating = true;
                   break;
                 }
                 const num = parseInt(String(cellVal || '').replace(/[^\d]/g, ''), 10);
                 if (!isNaN(num) && num >= 40 && num <= 99) {
                   parsedRating = num;
+                  hasExplicitRating = true;
                   break;
                 }
               }
             }
 
-            if (isNaN(parsedRating) || parsedRating < 40 || parsedRating > 99) {
+            if (!hasExplicitRating) {
               parsedRating = 80;
             }
 
@@ -674,7 +677,8 @@ class DatabaseService {
               divisao: divisao || '1ª Divisão',
               badgeColor: this.generateRandomColor(nome),
               rating: parsedRating,
-            });
+              hasExplicitRating,
+            } as Club & { hasExplicitRating: boolean });
           }
 
           if (importedClubs.length === 0) {
@@ -693,18 +697,25 @@ class DatabaseService {
             const currentClubs = this.getClubs().map(sanitizeClub);
             const mergedList: Club[] = [...currentClubs];
 
-            importedClubs.forEach((imp) => {
+            importedClubs.forEach((impWithFlag) => {
+              const imp = impWithFlag as Club & { hasExplicitRating?: boolean };
               const existingIndex = findClubMatchIndex(mergedList, imp.nome);
 
               if (existingIndex !== -1) {
                 // Update GER rating while preserving user custom edits (liga, divisao, pais, logoUrl)
                 const existing = mergedList[existingIndex];
-                if (existing.rating !== imp.rating) {
-                  updatedRatingsCount++;
+                let finalRating = existing.rating || 80;
+
+                if (imp.hasExplicitRating) {
+                  if (existing.rating !== imp.rating) {
+                    updatedRatingsCount++;
+                  }
+                  finalRating = imp.rating;
                 }
+
                 mergedList[existingIndex] = {
                   ...existing,
-                  rating: imp.rating, // UPDATE GER
+                  rating: finalRating,
                 };
               } else {
                 // Add new club from spreadsheet
