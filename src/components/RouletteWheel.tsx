@@ -3,8 +3,9 @@ import { Club, Settings } from '../types';
 import { audio } from '../services/audio';
 import { getTranslation } from '../services/i18n';
 import { getLeagueLogo } from '../services/leagueLogos';
+import { getGERTierConfig, GERTierConfig } from '../services/gerTiers';
 import { CountryFlag } from './CountryFlag';
-import { Dices, Sparkles, Shield, Trophy, Globe, TrendingUp, FastForward, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Dices, Sparkles, Shield, Trophy, Globe, TrendingUp, FastForward, CheckCircle2, RefreshCw, Zap } from 'lucide-react';
 
 interface RouletteWheelProps {
   clubs: Club[];
@@ -52,8 +53,8 @@ export function getCountryFlag(pais: string): string {
   return '🌍';
 }
 
-// Canvas Tunnel & Sparks Background Component
-const CanvasTunnel: React.FC<{ phase: string }> = ({ phase }) => {
+// Canvas Tunnel & Sparks Background Component with GER Tier Color Support
+const CanvasTunnel: React.FC<{ phase: string; tierConfig?: GERTierConfig }> = ({ phase, tierConfig }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -80,14 +81,21 @@ const CanvasTunnel: React.FC<{ phase: string }> = ({ phase }) => {
     }
 
     // Particles/Sparks
+    const isRevealed = phase === 'CLUB_CREST' || phase === 'CLUB_FULL';
+    const primary = isRevealed && tierConfig ? tierConfig.primaryColor : '#00FF85';
+    const secondary = isRevealed && tierConfig ? tierConfig.secondaryColor : '#02E374';
+    const accent = isRevealed && tierConfig ? tierConfig.accentColor : '#FFD700';
+
     const particles: { x: number; y: number; z: number; size: number; color: string }[] = [];
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < (isRevealed ? 70 : 50); i++) {
+      const rand = Math.random();
+      const pColor = rand > 0.6 ? primary : rand > 0.3 ? secondary : accent;
       particles.push({
         x: (Math.random() - 0.5) * width,
         y: (Math.random() - 0.5) * height,
         z: Math.random() * 1000,
-        size: Math.random() * 2 + 1,
-        color: Math.random() > 0.4 ? '#00FF85' : '#02E374',
+        size: Math.random() * (isRevealed ? 3.5 : 2) + 1,
+        color: pColor,
       });
     }
 
@@ -98,7 +106,7 @@ const CanvasTunnel: React.FC<{ phase: string }> = ({ phase }) => {
 
       // Draw 3D Tunnel Rings
       rings.forEach((ring) => {
-        ring.z -= phase === 'SUSPENSE' ? 18 : 10;
+        ring.z -= phase === 'SUSPENSE' ? 20 : isRevealed ? 15 : 10;
         if (ring.z <= 10) ring.z += 1000;
 
         const scale = 500 / ring.z;
@@ -107,17 +115,27 @@ const CanvasTunnel: React.FC<{ phase: string }> = ({ phase }) => {
 
         ctx.beginPath();
         ctx.ellipse(cx, cy, radiusX, radiusY, 0, 0, Math.PI * 2);
-        ctx.strokeStyle =
-          phase === 'SUSPENSE'
-            ? `rgba(255, 180, 0, ${Math.min(1, scale * 0.5)})`
-            : `rgba(0, 255, 133, ${Math.min(1, scale * 0.5)})`;
-        ctx.lineWidth = Math.max(1, 3 * scale);
+
+        if (isRevealed && tierConfig) {
+          ctx.strokeStyle = tierConfig.primaryColor;
+          ctx.shadowBlur = 12 * scale;
+          ctx.shadowColor = tierConfig.primaryColor;
+        } else if (phase === 'SUSPENSE') {
+          ctx.strokeStyle = `rgba(255, 180, 0, ${Math.min(1, scale * 0.5)})`;
+          ctx.shadowBlur = 10 * scale;
+          ctx.shadowColor = '#FFB400';
+        } else {
+          ctx.strokeStyle = `rgba(0, 255, 133, ${Math.min(1, scale * 0.5)})`;
+          ctx.shadowBlur = 0;
+        }
+
+        ctx.lineWidth = Math.max(1, (isRevealed ? 4 : 3) * scale);
         ctx.stroke();
       });
 
       // Draw Sparks
       particles.forEach((p) => {
-        p.z -= phase === 'SUSPENSE' ? 22 : 12;
+        p.z -= phase === 'SUSPENSE' ? 24 : isRevealed ? 18 : 12;
         if (p.z <= 10) {
           p.z += 1000;
           p.x = (Math.random() - 0.5) * width;
@@ -132,7 +150,7 @@ const CanvasTunnel: React.FC<{ phase: string }> = ({ phase }) => {
           ctx.beginPath();
           ctx.arc(px, py, p.size * scale, 0, Math.PI * 2);
           ctx.fillStyle = phase === 'SUSPENSE' ? '#FFD700' : p.color;
-          ctx.shadowBlur = 8 * scale;
+          ctx.shadowBlur = (isRevealed ? 12 : 8) * scale;
           ctx.shadowColor = p.color;
           ctx.fill();
         }
@@ -147,7 +165,7 @@ const CanvasTunnel: React.FC<{ phase: string }> = ({ phase }) => {
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
     };
-  }, [phase]);
+  }, [phase, tierConfig]);
 
   return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0 opacity-80" />;
 };
@@ -168,6 +186,8 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const lang = settings.language || 'pt';
+
+  const tierConfig = chosenClub ? getGERTierConfig(chosenClub.rating || 80) : getGERTierConfig(80);
 
   // Filter out excluded clubs
   const availableClubs = React.useMemo(() => {
@@ -261,6 +281,8 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
     onSpinComplete(chosenClub);
   };
 
+  const isRevealed = phase === 'CLUB_CREST' || phase === 'CLUB_FULL';
+
   return (
     <div className="w-full max-w-xl mx-auto flex flex-col items-center gap-6 py-4">
       {/* IDLE VIEW - SORTEAR CLUBE BUTTON */}
@@ -306,13 +328,29 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
 
       {/* CINEMATIC REVEAL MODAL STAGE (Phases 1-7) */}
       {phase !== 'IDLE' && (
-        <div className="relative w-full min-h-[420px] rounded-3xl bg-[#050608] border-2 border-[#00FF85]/50 shadow-2xl shadow-[#00FF85]/30 overflow-hidden flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
+        <div
+          className={`relative w-full min-h-[440px] rounded-3xl bg-[#050608] border-2 transition-all duration-700 overflow-hidden flex flex-col items-center justify-center p-6 text-center animate-fadeIn ${
+            isRevealed
+              ? `${tierConfig.borderClass} ${tierConfig.glowClass}`
+              : 'border-[#00FF85]/50 shadow-2xl shadow-[#00FF85]/30'
+          }`}
+        >
+          {/* Radial Gradient overlay based on GER tier */}
+          {isRevealed && (
+            <div
+              className={`absolute inset-0 bg-gradient-to-b ${tierConfig.bgGradientClass} opacity-60 pointer-events-none transition-all duration-700`}
+            />
+          )}
+
           {/* Canvas Tunnel */}
-          <CanvasTunnel phase={phase} />
+          <CanvasTunnel phase={phase} tierConfig={tierConfig} />
 
           {/* Flash / Light Explosions */}
           {phase === 'CLUB_CREST' && (
-            <div className="absolute inset-0 bg-white animate-ping opacity-20 pointer-events-none z-30" />
+            <div
+              className="absolute inset-0 animate-ping opacity-30 pointer-events-none z-30 transition-all"
+              style={{ backgroundColor: tierConfig.primaryColor }}
+            />
           )}
 
           {/* Skip Button (Pular) - Discrete at Top Right */}
@@ -412,41 +450,51 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
               </div>
             )}
 
-            {/* PHASE 6 & 7: REVELAÇÃO DO CLUBE */}
-            {(phase === 'CLUB_CREST' || phase === 'CLUB_FULL') && chosenClub && (
-              <div className="flex flex-col items-center gap-5 w-full animate-fadeIn">
-                <span className="text-xs font-black uppercase text-[#00FF85] tracking-widest bg-[#00FF85]/10 border border-[#00FF85]/40 px-4 py-1 rounded-full">
-                  ✨ {getTranslation(lang, 'revealingClub')}
-                </span>
+            {/* PHASE 6 & 7: REVELAÇÃO DO CLUBE COM ANIMAÇÃO & COR DO GER */}
+            {isRevealed && chosenClub && (
+              <div className="flex flex-col items-center gap-4 w-full animate-fadeIn">
+                {/* GER Tier Highlight Badge */}
+                <div className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2 ${tierConfig.badgeClass}`}>
+                  <Zap className="w-4 h-4 animate-bounce" style={{ color: tierConfig.primaryColor }} />
+                  <span>{tierConfig.badge}</span>
+                  <span className="opacity-90 font-mono font-bold bg-black/40 px-2 py-0.5 rounded-md border border-white/20">
+                    GER {chosenClub.rating || 80}
+                  </span>
+                </div>
 
-                {/* Shield / Crest */}
-                <div className="relative w-28 h-28 rounded-3xl bg-gray-900 border-2 border-[#00FF85] flex items-center justify-center shadow-2xl shadow-[#00FF85]/40 overflow-hidden p-2">
+                {/* Shield / Crest Frame with Tier Color Glow */}
+                <div
+                  className={`relative w-32 h-32 rounded-3xl bg-gray-900 border-4 flex items-center justify-center overflow-hidden p-2.5 transition-all duration-500 ${tierConfig.borderClass} ${tierConfig.glowClass}`}
+                  style={{
+                    background: `radial-gradient(circle, ${tierConfig.primaryColor}22 0%, #000000 100%)`,
+                  }}
+                >
                   {chosenClub.logoUrl ? (
                     <img
                       src={chosenClub.logoUrl}
                       alt={chosenClub.nome}
-                      className="w-full h-full object-contain p-1"
+                      className="w-full h-full object-contain p-1 drop-shadow-2xl"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <Shield className="w-14 h-14 text-gray-300" />
+                    <Shield className="w-16 h-16" style={{ color: tierConfig.primaryColor }} />
                   )}
                 </div>
 
                 {/* Club Name (Appears in step 7 or if showClubName is true) */}
                 {(showClubName || phase === 'CLUB_FULL') ? (
                   <div className="flex flex-col items-center gap-2 animate-fadeIn">
-                    <h2 className="text-3xl font-black text-white uppercase tracking-wide max-w-md">
+                    <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-wide max-w-md drop-shadow-lg">
                       🛡️ {chosenClub.nome}
                     </h2>
 
                     {/* Meta info pills */}
                     <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
-                      <span className="px-3 py-1 rounded-xl bg-gray-900 border border-gray-800 text-xs text-gray-300 font-bold flex items-center gap-1.5">
+                      <span className="px-3 py-1 rounded-xl bg-gray-900/90 border border-gray-800 text-xs text-gray-300 font-bold flex items-center gap-1.5 shadow-sm">
                         <CountryFlag country={chosenClub.pais} imageClassName="w-4 h-2.5 object-cover rounded-2xs inline-block shrink-0" />
                         <span>{chosenClub.pais}</span>
                       </span>
-                      <span className="px-3 py-1 rounded-xl bg-gray-900 border border-gray-800 text-xs text-amber-300 font-bold flex items-center gap-1.5">
+                      <span className="px-3 py-1 rounded-xl bg-gray-900/90 border border-gray-800 text-xs text-amber-300 font-bold flex items-center gap-1.5 shadow-sm">
                         {getLeagueLogo(chosenClub.liga) ? (
                           <span className="w-5 h-5 rounded-md bg-slate-100 p-0.5 inline-flex items-center justify-center shrink-0">
                             <img
@@ -461,14 +509,14 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
                         )}
                         <span>{chosenClub.liga}</span>
                       </span>
-                      <span className="px-3 py-1 rounded-xl bg-gray-900 border border-gray-800 text-xs text-blue-300 font-bold flex items-center gap-1">
+                      <span className="px-3 py-1 rounded-xl bg-gray-900/90 border border-gray-800 text-xs text-blue-300 font-bold flex items-center gap-1 shadow-sm">
                         <TrendingUp className="w-3.5 h-3.5 text-blue-400" />
                         <span>{chosenClub.divisao || '1ª Divisão'}</span>
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-10 flex items-center justify-center text-xs text-gray-500 font-mono animate-pulse">
+                  <div className="h-10 flex items-center justify-center text-xs font-mono font-bold animate-pulse" style={{ color: tierConfig.primaryColor }}>
                     Revelando nome...
                   </div>
                 )}
@@ -479,7 +527,11 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
                     <button
                       id="confirm-revealed-club-btn"
                       onClick={() => onSpinComplete(chosenClub)}
-                      className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#00FF85] via-[#02E374] to-[#00CC66] text-[#0a0b0e] font-black text-lg uppercase tracking-wider shadow-xl shadow-[#00FF85]/30 hover:scale-105 transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/40"
+                      className="w-full py-4 px-6 rounded-2xl text-[#0a0b0e] font-black text-lg uppercase tracking-wider shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-2 cursor-pointer border-2 border-white/60"
+                      style={{
+                        background: `linear-gradient(135deg, ${tierConfig.primaryColor} 0%, ${tierConfig.secondaryColor} 100%)`,
+                        boxShadow: `0 10px 30px ${tierConfig.primaryColor}55`,
+                      }}
                     >
                       <CheckCircle2 className="w-6 h-6" />
                       <span>{getTranslation(lang, 'confirmClub')}</span>
@@ -509,6 +561,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
     </div>
   );
 };
+
 
 
 

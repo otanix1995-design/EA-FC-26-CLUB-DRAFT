@@ -1,6 +1,7 @@
 import React from 'react';
 import { Club } from '../types';
 import { getLeagueLogo } from '../services/leagueLogos';
+import { getGERTierConfig } from '../services/gerTiers';
 import { Trophy, Shield, Globe, MapPin } from 'lucide-react';
 import { CountryFlag } from './CountryFlag';
 
@@ -17,7 +18,8 @@ export const ClubCard: React.FC<ClubCardProps> = ({
   size = 'normal',
   animate = true,
 }) => {
-  const rating = club.rating || 82;
+  const rating = club.rating || 80;
+  const tierConfig = getGERTierConfig(rating);
 
   // Sizing styles
   const sizeClasses = {
@@ -28,46 +30,60 @@ export const ClubCard: React.FC<ClubCardProps> = ({
 
   return (
     <div
-      className={`relative mx-auto rounded-2xl bg-gradient-to-b from-[#2A2312] via-[#1A1813] to-[#0D0C09] border-2 border-[#E5B842] shadow-2xl shadow-[#E5B842]/20 overflow-hidden flex flex-col items-center text-center transition-all duration-300 ${
+      className={`relative mx-auto rounded-2xl bg-gradient-to-b from-gray-900 via-[#111319] to-[#08090c] border-2 shadow-2xl overflow-hidden flex flex-col items-center text-center transition-all duration-300 ${tierConfig.borderClass} ${tierConfig.glowClass} ${
         sizeClasses[size]
-      } ${animate ? 'hover:scale-[1.02] hover:border-[#00FF85] hover:shadow-[#00FF85]/30' : ''}`}
+      } ${animate ? 'hover:scale-[1.03]' : ''}`}
     >
       {/* Background glowing polygon overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-[#FFD700]/20 via-transparent to-transparent pointer-events-none" />
+      <div
+        className="absolute inset-0 pointer-events-none opacity-40"
+        style={{
+          background: `radial-gradient(circle at top, ${tierConfig.primaryColor}33 0%, transparent 70%)`,
+        }}
+      />
 
       {/* FC Shimmer line effect */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#00FF85] to-transparent animate-pulse" />
+      <div
+        className="absolute top-0 left-0 right-0 h-1 animate-pulse"
+        style={{
+          background: `linear-gradient(90deg, transparent 0%, ${tierConfig.primaryColor} 50%, transparent 100%)`,
+        }}
+      />
 
       {/* Player Header if passed */}
       {playerTitle && (
-        <div className="mb-2 px-3 py-0.5 rounded-full bg-[#00FF85]/20 border border-[#00FF85]/50 text-[#00FF85] font-extrabold text-[11px] uppercase tracking-wider">
+        <div className="mb-2 px-3 py-0.5 rounded-full bg-black/60 border border-white/20 text-[#00FF85] font-extrabold text-[11px] uppercase tracking-wider">
           {playerTitle}
         </div>
       )}
 
       {/* Card Header: OVR + Country */}
-      <div className="w-full flex items-center justify-between border-b border-[#E5B842]/30 pb-2 mb-3">
+      <div className="w-full flex items-center justify-between border-b border-white/10 pb-2 mb-3">
         <div className="flex items-center gap-1.5">
-          <span className="font-mono font-black text-2xl md:text-3xl text-amber-300 tracking-tighter drop-shadow-md">
+          <span
+            className="font-mono font-black text-2xl md:text-3xl tracking-tighter drop-shadow-md"
+            style={{ color: tierConfig.primaryColor }}
+          >
             {rating}
           </span>
-          <span className="text-[10px] uppercase font-bold text-amber-200/70 tracking-widest leading-none">
+          <span className="text-[10px] uppercase font-black tracking-widest leading-none text-gray-400">
             OVR
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-md border border-[#E5B842]/20 text-xs">
-          <CountryFlag country={club.pais} imageClassName="w-5 h-3.5 object-cover rounded-xs border border-amber-400/30 shrink-0" />
+        <div className="flex items-center gap-1.5 bg-black/50 px-2 py-1 rounded-md border border-white/10 text-xs">
+          <CountryFlag country={club.pais} imageClassName="w-5 h-3.5 object-cover rounded-xs border border-white/20 shrink-0" />
           <span className="text-[11px] font-semibold text-gray-300 truncate max-w-[90px]">{club.pais}</span>
         </div>
       </div>
 
       {/* Club Crest Placeholder / Badge Icon */}
       <div
-        className="w-16 h-16 md:w-20 md:h-20 my-1 rounded-2xl flex items-center justify-center shadow-inner border-2 border-[#E5B842]/40 relative group overflow-hidden"
+        className="w-16 h-16 md:w-20 md:h-20 my-1 rounded-2xl flex items-center justify-center shadow-inner border-2 relative group overflow-hidden"
         style={{
+          borderColor: `${tierConfig.primaryColor}66`,
           background: club.logoUrl
-            ? 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.4) 100%)'
+            ? `radial-gradient(circle, ${tierConfig.primaryColor}15 0%, rgba(0,0,0,0.6) 100%)`
             : `linear-gradient(135deg, ${club.badgeColor || '#C8102E'} 0%, #111827 100%)`,
         }}
       >
@@ -83,21 +99,34 @@ export const ClubCard: React.FC<ClubCardProps> = ({
             }}
           />
         ) : (
-          <Shield className="w-10 h-10 md:w-12 md:h-12 text-amber-200/90 drop-shadow" />
+          <Shield className="w-10 h-10 md:w-12 md:h-12 text-gray-200 drop-shadow" />
         )}
-        <div className="absolute bottom-1 right-1 bg-black/60 p-1 rounded-full text-[10px] border border-amber-400/30">
+        <div className="absolute bottom-1 right-1 bg-black/70 p-1 rounded-full text-[10px] border border-white/20">
           <Trophy className="w-3 h-3 text-[#00FF85]" />
         </div>
       </div>
 
+      {/* Tier Label Pill */}
+      <div className="mt-1">
+        <span
+          className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-black/60 border"
+          style={{
+            borderColor: `${tierConfig.primaryColor}55`,
+            color: tierConfig.primaryColor,
+          }}
+        >
+          {tierConfig.badge}
+        </span>
+      </div>
+
       {/* Club Name */}
-      <h3 className="text-lg md:text-xl font-black text-white tracking-tight mt-2 line-clamp-1 drop-shadow-md">
+      <h3 className="text-lg md:text-xl font-black text-white tracking-tight mt-1 line-clamp-1 drop-shadow-md">
         {club.nome}
       </h3>
 
       {/* League & Division */}
-      <div className="w-full mt-3 pt-2 border-t border-amber-400/20 flex flex-col gap-1 text-xs">
-        <div className="flex items-center justify-center gap-1.5 text-amber-100/90 font-medium">
+      <div className="w-full mt-3 pt-2 border-t border-white/10 flex flex-col gap-1 text-xs">
+        <div className="flex items-center justify-center gap-1.5 text-gray-200 font-medium">
           {getLeagueLogo(club.liga) ? (
             <span className="w-5 h-5 rounded-md bg-slate-100 p-0.5 inline-flex items-center justify-center shrink-0 shadow-sm">
               <img
